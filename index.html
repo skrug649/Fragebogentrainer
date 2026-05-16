@@ -287,7 +287,7 @@ body.dark .fi.active .fc{background:rgba(217,48,37,.25);color:#ff9090}
   border-radius:50%;pointer-events:none;
 }
 .hero-left{position:relative;z-index:1;flex:1;min-width:0}
-.hero-right{position:relative;z-index:1;display:flex;align-items:center;gap:.75rem;flex-shrink:0;flex-wrap:wrap}
+.hero-right{position:relative;z-index:1;display:flex;align-items:center;gap:.75rem;flex-shrink:0;flex-wrap:wrap;overflow:hidden}
 .hey{
   font-size:10px;letter-spacing:2px;text-transform:uppercase;
   color:rgba(255,255,255,.7);font-weight:700;margin-bottom:5px;
@@ -1213,11 +1213,13 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
   .bottom-nav{display:block}
   .tg{grid-template-columns:1fr;gap:.6rem}
   .home-widgets-grid{grid-template-columns:1fr 1fr!important}
-  .hero{padding:.85rem 1rem}
+  .hero{padding:.85rem 1rem;flex-direction:column;align-items:stretch}
   .hero h1{font-size:14px}
+  .hero-right{flex-direction:row;justify-content:space-between;width:100%}
   .hero-stats{gap:.3rem}
-  .hero-stat{min-width:40px;padding:.3rem .4rem}
+  .hero-stat{min-width:40px;padding:.3rem .4rem;flex:1}
   .hero-stat-n{font-size:15px}
+  .sbtn{flex:1}
   .app{overflow-x:hidden}
   .tc{padding:.85rem}
   .trainer-grid{grid-template-columns:1fr}
@@ -1499,6 +1501,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 </div>
 
 <!-- Countdown + Tagesaufgabe + Bestleistung -->
+<div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
 <div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem" class="home-widgets-grid"></div>
 
 <!-- Fortschritt + Schnellzugriff: 2-Spalten -->
@@ -2407,6 +2410,7 @@ function getBestResult(){
 // ─── RENDER WIDGETS ────────────────────────────────────────
 function renderWidgets(){
   const el=document.getElementById("home-widgets");if(!el)return;
+  const cdEl=document.getElementById("home-widgets-countdown");
   const widgets=[];
   const streak=store.streak?.count||0;
   const fire=streak>=7?"🔥":streak>=3?"⚡":"✨";
@@ -2429,19 +2433,20 @@ function renderWidgets(){
   const cd=getCountdown();
   const cdText=store.countdownText||"Kreisübung";
   const isTrainerOrAdmin=currentProfile&&(currentProfile.role==="trainer"||currentProfile.role==="admin");
-  widgets.push(`<div class="widget-card" style="grid-column:span 1">
-    <div class="widget-title" style="font-size:10px;letter-spacing:1.5px">⏰ COUNTDOWN</div>
-    <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;color:var(--text);margin:4px 0 8px;line-height:1.2">${cdText}</div>
-    ${cd?cd.done?`<div class="widget-value" style="color:var(--red);font-size:32px">Heute!</div>`:
-    `<div class="countdown-grid" id="cd-grid" style="gap:6px;margin:4px 0 10px">
-      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-d" style="font-size:28px">${cd.days}</div><div class="countdown-l">Tage</div></div>
-      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-h" style="font-size:28px">${cd.hours}</div><div class="countdown-l">Std</div></div>
-      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-m" style="font-size:28px">${cd.mins}</div><div class="countdown-l">Min</div></div>
-      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-s" style="font-size:28px">${cd.secs}</div><div class="countdown-l">Sek</div></div>
-    </div>`:`<div class="widget-value" style="font-size:20px;color:var(--text3)">–</div>
-    <div class="widget-sub">Kein Datum gesetzt</div>`}
-    ${isTrainerOrAdmin?`<button class="widget-action" onclick="goAdmin()">📅 Datum & Text ändern</button>`:""}
-  </div>`);
+  if(cdEl){
+    cdEl.innerHTML=`<div class="widget-card" style="text-align:center;padding:1.25rem">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:4px">⏰ COUNTDOWN</div>
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;color:var(--text);margin-bottom:12px">${cdText}</div>
+      ${cd?cd.done?`<div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:36px;color:var(--red)">Heute!</div>`:
+      `<div style="display:flex;justify-content:center;gap:10px;margin-bottom:12px">
+        <div class="countdown-box" style="padding:12px 16px;min-width:64px"><div class="countdown-n" id="cd-d" style="font-size:32px">${cd.days}</div><div class="countdown-l">Tage</div></div>
+        <div class="countdown-box" style="padding:12px 16px;min-width:64px"><div class="countdown-n" id="cd-h" style="font-size:32px">${cd.hours}</div><div class="countdown-l">Std</div></div>
+        <div class="countdown-box" style="padding:12px 16px;min-width:64px"><div class="countdown-n" id="cd-m" style="font-size:32px">${cd.mins}</div><div class="countdown-l">Min</div></div>
+        <div class="countdown-box" style="padding:12px 16px;min-width:64px"><div class="countdown-n" id="cd-s" style="font-size:32px">${cd.secs}</div><div class="countdown-l">Sek</div></div>
+      </div>`:`<div style="font-size:16px;color:var(--text3);margin-bottom:8px">Kein Datum gesetzt</div>`}
+      ${isTrainerOrAdmin?`<button class="widget-action" style="max-width:220px;margin:0 auto" onclick="goAdmin()">📅 Datum & Text ändern</button>`:""}
+    </div>`;
+  }
   const best=getBestResult();
   widgets.push(`<div class="widget-card">
     <div class="widget-title">🏆 Bestleistung</div>
