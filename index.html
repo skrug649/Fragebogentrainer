@@ -1316,6 +1316,81 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 </div>
 
 
+<!-- BEAMER SCREEN -->
+<div id="screen-beamer" style="display:none;position:fixed;inset:0;z-index:600;background:#0d0d0d;color:white;flex-direction:column;font-family:'Inter',sans-serif">
+
+  <!-- Header -->
+  <div style="background:#cc0000;padding:10px 2rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">🔥</span>
+      <div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:14px;letter-spacing:.5px">JUGENDFEUERWEHR MENGERINGHAUSEN</div>
+        <div id="beamer-subtitle" style="font-size:11px;opacity:.75">Fragenbogentrainer · Gruppenübung</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="beamer-counter" style="font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;background:rgba(0,0,0,.3);padding:5px 12px;border-radius:99px"></span>
+      <button onclick="closeBeamer()" style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.2);color:white;padding:6px 14px;border-radius:6px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer">✕ Beenden</button>
+    </div>
+  </div>
+
+  <!-- Setup Screen -->
+  <div id="beamer-setup" style="flex:1;display:flex;align-items:center;justify-content:center;padding:2rem">
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:16px;padding:2.5rem;max-width:480px;width:100%;text-align:center">
+      <div style="font-size:48px;margin-bottom:1rem">📽️</div>
+      <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:26px;margin-bottom:.4rem">Beamer-Modus</div>
+      <div style="font-size:14px;color:#888;margin-bottom:2rem">Gruppenübung auf dem Beamer</div>
+      <div style="display:flex;flex-direction:column;gap:.9rem;margin-bottom:2rem;text-align:left">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#666;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px">Thema</label>
+          <select id="beamer-thema-sel" style="width:100%;background:#2a2a2a;border:1px solid #444;border-radius:8px;padding:10px 12px;font-size:14px;color:white;font-family:'Inter',sans-serif"></select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#666;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px">Stufe</label>
+          <select id="beamer-stufe-sel" style="width:100%;background:#2a2a2a;border:1px solid #444;border-radius:8px;padding:10px 12px;font-size:14px;color:white;font-family:'Inter',sans-serif">
+            <option value="alle">Alle Stufen</option>
+            <option value="1">Stufe 1</option>
+            <option value="2">Stufe 2</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:#666;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:5px">Reihenfolge</label>
+          <select id="beamer-order-sel" style="width:100%;background:#2a2a2a;border:1px solid #444;border-radius:8px;padding:10px 12px;font-size:14px;color:white;font-family:'Inter',sans-serif">
+            <option value="zufall">Zufällig</option>
+            <option value="sortiert">Sortiert</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="startBeamer()" style="width:100%;background:#cc0000;color:white;border:none;border-radius:10px;padding:16px;font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;cursor:pointer">▶ Gruppenübung starten</button>
+    </div>
+  </div>
+
+  <!-- Quiz Screen -->
+  <div id="beamer-quiz" style="flex:1;display:none;flex-direction:column;padding:2.5rem 4rem;overflow:auto">
+    <div style="height:5px;background:#222;border-radius:99px;overflow:hidden;margin-bottom:2.5rem;flex-shrink:0">
+      <div id="beamer-prog" style="height:100%;background:#cc0000;border-radius:99px;transition:width .4s"></div>
+    </div>
+    <div id="beamer-thema-tag" style="font-size:13px;font-weight:700;color:#cc0000;letter-spacing:1px;text-transform:uppercase;margin-bottom:1rem;flex-shrink:0"></div>
+    <div id="beamer-question" style="font-family:'Outfit',sans-serif;font-weight:900;font-size:clamp(20px,3.5vw,40px);line-height:1.3;color:white;margin-bottom:2.5rem;flex:1"></div>
+    <div id="beamer-answers" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem;flex-shrink:0"></div>
+    <div style="display:flex;justify-content:center;gap:1rem;flex-shrink:0;padding-bottom:1rem">
+      <button id="beamer-reveal-btn" onclick="beamerReveal()" style="background:#cc0000;color:white;border:none;border-radius:10px;padding:14px 32px;font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;cursor:pointer">👁 Antwort aufdecken</button>
+      <button id="beamer-next-btn" onclick="beamerNext()" style="display:none;background:#2a2a2a;color:white;border:1px solid #444;border-radius:10px;padding:14px 32px;font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;cursor:pointer">Nächste Frage →</button>
+    </div>
+  </div>
+
+  <!-- End Screen -->
+  <div id="beamer-end" style="flex:1;display:none;align-items:center;justify-content:center;text-align:center">
+    <div>
+      <div style="font-size:80px;margin-bottom:1rem">🎉</div>
+      <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:36px;margin-bottom:.5rem">Alle Fragen durch!</div>
+      <div style="font-size:16px;color:#888;margin-bottom:2rem">Gruppenübung abgeschlossen</div>
+      <button onclick="openBeamer()" style="background:#cc0000;color:white;border:none;border-radius:10px;padding:14px 32px;font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;cursor:pointer;margin-right:1rem">🔄 Nochmal</button>
+      <button onclick="closeBeamer()" style="background:#2a2a2a;color:white;border:1px solid #444;border-radius:10px;padding:14px 32px;font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;cursor:pointer">✕ Beenden</button>
+    </div>
+  </div>
+</div>
+
 <div id="login-screen" style="display:none;position:fixed;inset:0;z-index:500;background:var(--bg)">
 <div class="login-wrap">
 <div class="login-card">
@@ -1383,6 +1458,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:12.5px;padding:7px 12px">🎯 Prüfungen</button>
       <button class="bp" onclick="loadAllParticipants()">🔄 Aktualisieren</button>
       <button class="bse" onclick="exportPDF()" style="font-size:12.5px;padding:7px 12px">📄 PDF Export</button>
+      <button class="bse" onclick="openBeamer()" style="font-size:12.5px;padding:7px 12px;background:#1a1a1a;color:white;border-color:#444">📽️ Beamer</button>
     </div>
   </div>
   <!-- Gruppenfortschritt -->
@@ -3242,6 +3318,90 @@ function setTrainerView(view) {
   }
 }
 
+async // ─── BEAMER MODUS ──────────────────────────────────────────
+let beamerQuiz = [], beamerIdx = 0, beamerRevealed = false;
+
+function openBeamer() {
+  const screen = document.getElementById("screen-beamer");
+  screen.style.display = "flex";
+  // Populate thema select
+  const sel = document.getElementById("beamer-thema-sel");
+  const themen = ["alle", ...new Set(ALL.map(q => q.thema))];
+  sel.innerHTML = themen.map(t => `<option value="${t}">${t === "alle" ? "Alle Themen" : (ICONS[t]||"") + " " + t}</option>`).join("");
+  // Reset to setup
+  document.getElementById("beamer-setup").style.display = "flex";
+  document.getElementById("beamer-quiz").style.display = "none";
+  document.getElementById("beamer-end").style.display = "none";
+}
+
+function closeBeamer() {
+  document.getElementById("screen-beamer").style.display = "none";
+}
+
+function startBeamer() {
+  const thema = document.getElementById("beamer-thema-sel").value;
+  const stufe = document.getElementById("beamer-stufe-sel").value;
+  const order = document.getElementById("beamer-order-sel").value;
+  let qs = [...ALL];
+  if (thema !== "alle") qs = qs.filter(q => q.thema === thema);
+  if (stufe !== "alle") qs = qs.filter(q => String(q.stufe) === stufe);
+  if (!qs.length) { alert("Keine Fragen für diese Auswahl."); return; }
+  beamerQuiz = order === "zufall" ? shuffle(qs) : qs;
+  beamerIdx = 0;
+  document.getElementById("beamer-setup").style.display = "none";
+  document.getElementById("beamer-quiz").style.display = "flex";
+  document.getElementById("beamer-end").style.display = "none";
+  const label = thema === "alle" ? "Alle Themen" : thema;
+  document.getElementById("beamer-subtitle").textContent = label + (stufe !== "alle" ? " · Stufe " + stufe : "");
+  beamerShowQ();
+}
+
+function beamerShowQ() {
+  if (beamerIdx >= beamerQuiz.length) {
+    document.getElementById("beamer-quiz").style.display = "none";
+    document.getElementById("beamer-end").style.display = "flex";
+    return;
+  }
+  beamerRevealed = false;
+  const q = beamerQuiz[beamerIdx];
+  const pct = Math.round(beamerIdx / beamerQuiz.length * 100);
+  document.getElementById("beamer-prog").style.width = pct + "%";
+  document.getElementById("beamer-counter").textContent = (beamerIdx + 1) + " / " + beamerQuiz.length;
+  document.getElementById("beamer-thema-tag").textContent = (ICONS[q.thema]||"📋") + " " + q.thema + " · Stufe " + q.stufe;
+  document.getElementById("beamer-question").textContent = q.frage;
+  const keys = ["A", "B", "C", "D"];
+  document.getElementById("beamer-answers").innerHTML = q.antworten.map((a, i) => `
+    <div id="beamer-ans-${i}" style="background:#1a1a1a;border:2px solid #333;border-radius:12px;padding:1.2rem 1.5rem;display:flex;align-items:center;gap:14px;transition:all .3s">
+      <div style="width:36px;height:36px;border-radius:50%;background:#cc0000;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-weight:800;font-size:16px;flex-shrink:0">${keys[i]}</div>
+      <span style="font-size:clamp(14px,2vw,20px);font-weight:500;line-height:1.3">${a.text}</span>
+    </div>`).join("");
+  document.getElementById("beamer-reveal-btn").style.display = "block";
+  document.getElementById("beamer-next-btn").style.display = "none";
+}
+
+function beamerReveal() {
+  if (beamerRevealed) return;
+  beamerRevealed = true;
+  const q = beamerQuiz[beamerIdx];
+  q.antworten.forEach((a, i) => {
+    const el = document.getElementById("beamer-ans-" + i);
+    if (a.korrekt) {
+      el.style.background = "#0d3d1a";
+      el.style.borderColor = "#2e7d32";
+      el.style.transform = "scale(1.02)";
+    } else {
+      el.style.opacity = "0.4";
+    }
+  });
+  document.getElementById("beamer-reveal-btn").style.display = "none";
+  document.getElementById("beamer-next-btn").style.display = "block";
+}
+
+function beamerNext() {
+  beamerIdx++;
+  beamerShowQ();
+}
+
 async function renderPodium() {
   const el = document.getElementById("home-podium");
   if (!el) return;
@@ -3276,22 +3436,29 @@ async function renderPodium() {
   const colors = ["#FFD700", "#C0C0C0", "#CD7F32"];
   const sizes = ["28px", "22px", "20px"];
 
+  const maxScore = top3[0].score || 1;
   el.innerHTML = `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;box-shadow:var(--shadow-sm)">
       <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:.9rem;display:flex;align-items:center;gap:8px">
         🏆 Wochenpodium
         <span style="font-size:11px;font-weight:500;color:var(--text3)">diese Woche</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        ${top3.map((p, i) => `
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:var(--radius-sm);border-left:3px solid ${colors[i]}">
-            <span style="font-size:${sizes[i]};line-height:1;flex-shrink:0">${medals[i]}</span>
-            <div class="pc-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${p.name.charAt(0).toUpperCase()}</div>
-            <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;flex:1">${p.name}</span>
-            <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:${colors[i]}">${p.score}</span>
-            <span style="font-size:11px;color:var(--text3)">richtig</span>
-          </div>
-        `).join("")}
+      <div style="font-size:12px;color:var(--text3);margin-bottom:.75rem">Wer hat diese Woche die meisten Fragen richtig beantwortet?</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${top3.map((p, i) => {
+          const barPct = Math.round(p.score / maxScore * 100);
+          return `
+          <div style="padding:8px 10px;background:var(--bg3);border-radius:var(--radius-sm);border-left:3px solid ${colors[i]}">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <span style="font-size:${sizes[i]};line-height:1;flex-shrink:0">${medals[i]}</span>
+              <div class="pc-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${p.name.charAt(0).toUpperCase()}</div>
+              <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;flex:1">${p.name}</span>
+            </div>
+            <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden">
+              <div style="height:100%;width:${barPct}%;background:${colors[i]};border-radius:99px;transition:width .5s ease"></div>
+            </div>
+          </div>`;
+        }).join("")}
         ${scores.length > 3 ? `<div style="font-size:11.5px;color:var(--text3);text-align:center;margin-top:2px">+${scores.length - 3} weitere Teilnehmer</div>` : ""}
       </div>
     </div>
