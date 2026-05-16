@@ -1367,6 +1367,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <button class="bse" id="trainer-view-cards" onclick="setTrainerView('cards')" style="font-size:12.5px;padding:7px 12px">🃏 Karten</button>
       <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:12.5px;padding:7px 12px">📊 Vergleich</button>
       <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:12.5px;padding:7px 12px">🔍 Schwachstellen</button>
+      <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:12.5px;padding:7px 12px">💡 Empfehlungen</button>
       <button class="bp" onclick="loadAllParticipants()">🔄 Aktualisieren</button>
     </div>
   </div>
@@ -1382,6 +1383,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div id="trainer-list"></div>
   <div id="trainer-table" style="display:none"></div>
   <div id="trainer-auswertung" style="display:none"></div>
+  <div id="trainer-empfehlungen" style="display:none"></div>
 </div>
 
 <!-- ADMIN SCREEN -->
@@ -3096,7 +3098,7 @@ function participantCardHTML(p) {
   const neverActive = !p.store?.history?.length;
   const inactiveWarning = isInactive ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--amber)">⚠️ ${days} Tage nicht geübt</div>`
     : neverActive ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--red)">🔴 Noch nie geübt</div>` : "";
-  const cardBorder = isInactive ? "border-color:rgba(230,81,0,.5);" : neverActive ? "border-color:rgba(204,0,0,.4);" : "";
+  const cardBorder = isInactive ? "border:2px solid var(--amber);" : neverActive ? "border:2px solid var(--red);" : "";
 
   return `<div class="participant-card" style="${cardBorder}">
     <div class="pc-head">
@@ -3137,12 +3139,10 @@ function setTrainerView(view) {
   const btnCards = document.getElementById("trainer-view-cards");
   const btnTable = document.getElementById("trainer-view-table");
   const btnAuswertung = document.getElementById("trainer-view-auswertung");
-  cards.style.display = "none";
-  table.style.display = "none";
-  auswertung.style.display = "none";
-  btnCards.className = "bse"; btnTable.className = "bse"; btnAuswertung.className = "bse";
-  btnCards.style.fontSize = btnTable.style.fontSize = btnAuswertung.style.fontSize = "12.5px";
-  btnCards.style.padding = btnTable.style.padding = btnAuswertung.style.padding = "7px 12px";
+  const btnEmpfehlungen = document.getElementById("trainer-view-empfehlungen");
+  const empfehlungen = document.getElementById("trainer-empfehlungen");
+  [cards, table, auswertung, empfehlungen].forEach(el => el.style.display = "none");
+  [btnCards, btnTable, btnAuswertung, btnEmpfehlungen].forEach(btn => { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; });
   if (view === "cards") {
     cards.style.display = "block"; btnCards.className = "bp"; btnCards.style.fontSize = "12.5px"; btnCards.style.padding = "7px 12px";
   } else if (view === "table") {
@@ -3151,6 +3151,9 @@ function setTrainerView(view) {
   } else if (view === "auswertung") {
     auswertung.style.display = "block"; btnAuswertung.className = "bp"; btnAuswertung.style.fontSize = "12.5px"; btnAuswertung.style.padding = "7px 12px";
     renderAuswertung();
+  } else if (view === "empfehlungen") {
+    empfehlungen.style.display = "block"; btnEmpfehlungen.className = "bp"; btnEmpfehlungen.style.fontSize = "12.5px"; btnEmpfehlungen.style.padding = "7px 12px";
+    renderEmpfehlungen();
   }
 }
 
@@ -3230,6 +3233,133 @@ function renderGroupProgress() {
           <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${neverCount > 0 ? 'var(--red)' : 'var(--green)'};line-height:1">${neverCount}</div>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function renderEmpfehlungen() {
+  const el = document.getElementById("trainer-empfehlungen");
+  if (!trainerParticipants.length) {
+    el.innerHTML = "<div style='color:var(--text3);padding:1rem'>Keine Teilnehmer vorhanden.</div>";
+    return;
+  }
+
+  // Aggregate thema stats across all participants
+  const themaStats = {};
+  for (const p of trainerParticipants) {
+    const qstats = p.store?.qstats || {};
+    for (const q of ALL) {
+      const k = `${q.thema}|${q.nr}|${q.stufe}`;
+      const v = qstats[k];
+      if (!themaStats[q.thema]) themaStats[q.thema] = { total: 0, correct: 0 };
+      if (v) { themaStats[q.thema].total += v.total; themaStats[q.thema].correct += v.correct; }
+    }
+  }
+
+  // Find weak themes (< 70% hit rate, min 5 answers)
+  const weakThemen = Object.entries(themaStats)
+    .filter(([t, v]) => v.total >= 5)
+    .map(([t, v]) => ({ thema: t, pct: Math.round(v.correct / v.total * 100), total: v.total }))
+    .sort((a, b) => a.pct - b.pct)
+    .filter(t => t.pct < 70);
+
+  // Find inactive participants
+  const inactive = trainerParticipants.filter(p => { const d = daysSinceLastActivity(p); return d !== null && d > 7; });
+  const never = trainerParticipants.filter(p => !p.store?.history?.length);
+
+  // Overall group progress
+  const totalDone = trainerParticipants.reduce((s, p) => s + Object.keys(p.store?.done || {}).length, 0);
+  const avgPct = Math.round(totalDone / trainerParticipants.length / ALL.length * 100);
+
+  // Build recommendations
+  const recs = [];
+
+  if (never.length > 0) {
+    recs.push({
+      prio: "hoch",
+      icon: "🔴",
+      titel: `${never.length} Teilnehmer ${never.length === 1 ? "hat" : "haben"} noch nie geübt`,
+      text: never.map(p => p.name).join(", "),
+      aktion: "Bitte diese Teilnehmer direkt ansprechen und zum Üben motivieren."
+    });
+  }
+
+  if (inactive.length > 0) {
+    recs.push({
+      prio: "mittel",
+      icon: "🟡",
+      titel: `${inactive.length} Teilnehmer seit mehr als 7 Tagen inaktiv`,
+      text: inactive.map(p => { const d = daysSinceLastActivity(p); return `${p.name} (${d} Tage)`; }).join(", "),
+      aktion: "Erinnerung aussprechen – vielleicht in der nächsten Übung ansprechen."
+    });
+  }
+
+  if (weakThemen.length > 0) {
+    const top3 = weakThemen.slice(0, 3);
+    recs.push({
+      prio: "mittel",
+      icon: "📚",
+      titel: `Gemeinsam üben: ${top3.map(t => t.thema).join(", ")}`,
+      text: top3.map(t => `${t.thema}: nur ${t.pct}% richtig`).join(" · "),
+      aktion: "Diese Themen als Schwerpunkt in der nächsten Gruppenstunde einplanen."
+    });
+  }
+
+  if (avgPct < 50) {
+    recs.push({
+      prio: "hoch",
+      icon: "⚡",
+      titel: "Gesamtfortschritt unter 50% – Zeit aufholen!",
+      text: `Die Gruppe hat im Schnitt erst ${avgPct}% der Fragen bearbeitet.`,
+      aktion: "Regelmäßiges Üben empfehlen – mindestens 15 Minuten pro Tag."
+    });
+  } else if (avgPct >= 80) {
+    recs.push({
+      prio: "gut",
+      icon: "🏆",
+      titel: "Gruppe ist gut vorbereitet!",
+      text: `Durchschnittlich ${avgPct}% der Fragen bearbeitet.`,
+      aktion: "Weiter so! Fokus auf die Schwachstellen-Themen legen."
+    });
+  }
+
+  if (recs.length === 0) {
+    recs.push({
+      prio: "gut",
+      icon: "✅",
+      titel: "Alles im grünen Bereich!",
+      text: "Keine kritischen Probleme festgestellt.",
+      aktion: "Weiter regelmäßig üben und Schwachstellen im Blick behalten."
+    });
+  }
+
+  const prioColor = { hoch: "var(--red)", mittel: "var(--amber)", gut: "var(--green)" };
+  const prioLabel = { hoch: "Hohe Priorität", mittel: "Mittlere Priorität", gut: "Gut" };
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:var(--text)">
+        💡 Empfehlungen für den Trainer
+        <span style="font-size:12px;font-weight:500;color:var(--text3);margin-left:8px">basierend auf aktuellen Daten</span>
+      </div>
+      ${recs.map(r => `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid ${prioColor[r.prio]};border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="font-size:24px;line-height:1;flex-shrink:0">${r.icon}</div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:.4rem;flex-wrap:wrap">
+                <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:var(--text)">${r.titel}</div>
+                <span style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:${prioColor[r.prio]};color:white;border-radius:99px;padding:2px 8px">${prioLabel[r.prio]}</span>
+              </div>
+              <div style="font-size:13px;color:var(--text3);margin-bottom:.6rem">${r.text}</div>
+              <div style="display:flex;align-items:flex-start;gap:6px;background:var(--bg3);border-radius:var(--radius-sm);padding:.6rem .9rem">
+                <span style="font-size:13px;flex-shrink:0">👉</span>
+                <span style="font-size:13px;color:var(--text2);font-weight:500">${r.aktion}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join("")}
     </div>
   `;
 }
