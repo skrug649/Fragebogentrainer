@@ -2459,7 +2459,7 @@ function renderWidgets(){
         <div class="countdown-box" style="padding:12px 16px;min-width:64px"><div class="countdown-n" id="cd-m" style="font-size:32px">${cd.mins}</div><div class="countdown-l">Min</div></div>
         <div class="countdown-box" style="padding:12px 16px;min-width:64px"><div class="countdown-n" id="cd-s" style="font-size:32px">${cd.secs}</div><div class="countdown-l">Sek</div></div>
       </div>`:`<div style="font-size:16px;color:var(--text3);margin-bottom:8px">Kein Datum gesetzt</div>`}
-      ${isTrainerOrAdmin?`<button class="widget-action" style="max-width:220px;margin:0 auto" onclick="goAdmin()">📅 Datum & Text ändern</button>`:""}
+      ${currentProfile&&currentProfile.role==="admin"?`<button class="widget-action" style="max-width:220px;margin:0 auto" onclick="goAdmin()">📅 Datum & Text ändern</button>`:""}
     </div>`;
   }
   const best=getBestResult();
@@ -3727,6 +3727,10 @@ function renderComparisonTable() {
 
 // ─── ADMIN VIEW ────────────────────────────────────────────
 async function goAdmin() {
+  if (!currentProfile || currentProfile.role !== "admin") {
+    alert("Kein Zugriff – nur Admins können den Admin-Bereich öffnen.");
+    return;
+  }
   document.getElementById("screen-trainer").style.display = "none";
   document.getElementById("screen-admin").style.display = "block";
   window.scrollTo(0, 0);
