@@ -1312,6 +1312,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div class="more-menu" id="more-menu">
   <div class="more-item" id="mi-hist" onclick="goHist();closeMobileMore()">📅 Verlauf</div>
   <div class="more-item" id="mi-test" onclick="goTest();closeMobileMore()">📄 Testbogen</div>
+  <div class="more-item" onclick="toggleDark();closeMobileMore()" id="mi-dark">🌙 Darkmode</div>
 </div>
 
 
@@ -1771,7 +1772,10 @@ function recordAnswer(q,ok){
 function toggleDark(){
   store.dark=!store.dark;saveStore();
   document.body.classList.toggle("dark",store.dark);
-  document.getElementById("dark-btn").textContent=store.dark?"☀️":"🌙";
+  const btn=document.getElementById("dark-btn");
+  if(btn)btn.textContent=store.dark?"☀️":"🌙";
+  const mi=document.getElementById("mi-dark");
+  if(mi)mi.textContent=store.dark?"☀️ Hellmodus":"🌙 Darkmode";
 }
 if(store.dark){document.body.classList.add("dark");document.getElementById("dark-btn").textContent="☀️";}
 
