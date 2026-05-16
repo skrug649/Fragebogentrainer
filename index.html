@@ -2802,11 +2802,19 @@ async function doLogin() {
   const pw = document.getElementById("li-pw").value;
   if (!name || !pw) { showLoginError("Bitte Name und Passwort eingeben."); return; }
   const sb = await initSupabase();
-  // Use stored email for this user
+  // First try localStorage (legacy, same device)
   const users = getLocalUsers();
   const userRecord = users.find(u => u.name.toLowerCase() === name.toLowerCase());
-  if (!userRecord) { showLoginError("Name nicht gefunden."); return; }
-  const email = userRecord.email;
+  let email = userRecord?.email;
+  // If not found locally, fetch email from Supabase profiles table
+  if (!email) {
+    const { data: profile } = await sb.from("profiles").select("email").ilike("name", name).single();
+    if (!profile?.email) { showLoginError("Name nicht gefunden."); return; }
+    email = profile.email;
+    // Cache locally for next time
+    users.push({ name, email });
+    localStorage.setItem('fw_email_map', JSON.stringify(users));
+  }
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
   if (error) { showLoginError("Name oder Passwort falsch."); return; }
   await loadProfile(data.user);
@@ -2852,6 +2860,7 @@ async function doRegister() {
       id: data.user.id,
       name: name,
       role: role,
+      email: email,
       store: {}
     });
     await loadProfile(data.user);
