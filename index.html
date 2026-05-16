@@ -2695,7 +2695,7 @@ async function logout() {
 saveStore = function() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch(e) {}
   if (currentUser && supabaseClient) {
-    supabase.from("profiles").update({ store }).eq("id", currentUser.id).then(() => {});
+    supabaseClient.from("profiles").update({ store }).eq("id", currentUser.id).then(() => {});
   }
 };
 
