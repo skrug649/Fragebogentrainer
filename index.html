@@ -1508,6 +1508,9 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
 <div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem" class="home-widgets-grid"></div>
 
+<!-- Wochenpodium -->
+<div id="home-podium" style="margin-bottom:1.25rem"></div>
+
 <!-- Fortschritt + Schnellzugriff: 2-Spalten -->
 <div class="home-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
 
@@ -2970,6 +2973,7 @@ function onLogin() {
   applyF(); updBookmarkSidebar(); renderResumeBanner();
   updateStreak(); renderWidgets();
   loadCountdownDate();
+  renderPodium();
 }
 
 async function logout() {
@@ -3236,6 +3240,62 @@ function setTrainerView(view) {
     btnAnfragen.className = "bp"; btnAnfragen.style.fontSize = "12.5px"; btnAnfragen.style.padding = "7px 12px";
     renderAnfragen();
   }
+}
+
+async function renderPodium() {
+  const el = document.getElementById("home-podium");
+  if (!el) return;
+
+  // Get all teilnehmer profiles
+  const sb = await initSupabase();
+  const { data: profiles } = await sb.from("profiles").select("name, store").eq("role", "teilnehmer");
+  if (!profiles || profiles.length < 2) { el.innerHTML = ""; return; }
+
+  // Calculate this week's correct answers per person
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+
+  const scores = profiles.map(p => {
+    const hist = p.store?.history || [];
+    // Sum correct answers from sessions this week
+    const weekCorrect = hist.filter(h => {
+      const parts = h.date.split(".");
+      if (parts.length !== 3) return false;
+      const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      return d >= monday;
+    }).reduce((sum, h) => sum + (h.cor || 0), 0);
+    return { name: p.name, score: weekCorrect };
+  }).sort((a, b) => b.score - a.score);
+
+  const top3 = scores.slice(0, 3);
+  if (top3.every(p => p.score === 0)) { el.innerHTML = ""; return; }
+
+  const medals = ["🥇", "🥈", "🥉"];
+  const colors = ["#FFD700", "#C0C0C0", "#CD7F32"];
+  const sizes = ["28px", "22px", "20px"];
+
+  el.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;box-shadow:var(--shadow-sm)">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:.9rem;display:flex;align-items:center;gap:8px">
+        🏆 Wochenpodium
+        <span style="font-size:11px;font-weight:500;color:var(--text3)">diese Woche</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${top3.map((p, i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:var(--radius-sm);border-left:3px solid ${colors[i]}">
+            <span style="font-size:${sizes[i]};line-height:1;flex-shrink:0">${medals[i]}</span>
+            <div class="pc-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${p.name.charAt(0).toUpperCase()}</div>
+            <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;flex:1">${p.name}</span>
+            <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:${colors[i]}">${p.score}</span>
+            <span style="font-size:11px;color:var(--text3)">richtig</span>
+          </div>
+        `).join("")}
+        ${scores.length > 3 ? `<div style="font-size:11.5px;color:var(--text3);text-align:center;margin-top:2px">+${scores.length - 3} weitere Teilnehmer</div>` : ""}
+      </div>
+    </div>
+  `;
 }
 
 function renderGroupProgress() {
