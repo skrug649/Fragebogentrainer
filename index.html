@@ -1427,6 +1427,16 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
     <div id="catalog-status" style="font-size:12.5px;color:var(--text3);margin-top:.5rem"></div>
   </div>
 
+  <!-- E-Mail Migration -->
+  <div class="admin-section" id="migration-section">
+    <div class="admin-section-title">🔧 E-Mail-Daten reparieren</div>
+    <div class="admin-section-sub">Behebt das Problem, dass sich Nutzer auf anderen Geräten nicht anmelden können. Einmalig ausführen.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="bp" onclick="runEmailMigration()">▶ Jetzt reparieren</button>
+      <span id="migration-status" style="font-size:12.5px;color:var(--text3)"></span>
+    </div>
+  </div>
+
   <!-- User management -->
   <div class="admin-section">
     <div class="admin-section-title">👤 Nutzer verwalten</div>
@@ -3253,6 +3263,48 @@ async function resetPassword(id, name) {
     setTimeout(() => toast.remove(), 3000);
   };
   input.focus();
+}
+
+async function runEmailMigration() {
+  const statusEl = document.getElementById('migration-status');
+  statusEl.textContent = 'Wird ausgeführt...';
+  statusEl.style.color = 'var(--text3)';
+  try {
+    const sb = await initSupabase();
+    // Get all profiles that have no email set
+    const { data: profiles } = await sb.from('profiles').select('id, name, email');
+    if (!profiles || !profiles.length) {
+      statusEl.textContent = 'Keine Nutzer gefunden.';
+      return;
+    }
+    // Get local email map from this device
+    const localUsers = getLocalUsers();
+    let updated = 0;
+    let missing = 0;
+    for (const p of profiles) {
+      if (p.email) continue; // already has email, skip
+      const local = localUsers.find(u => u.name.toLowerCase() === p.name.toLowerCase());
+      if (local?.email) {
+        await sb.from('profiles').update({ email: local.email }).eq('id', p.id);
+        updated++;
+      } else {
+        missing++;
+      }
+    }
+    if (missing > 0) {
+      statusEl.style.color = 'var(--amber)';
+      statusEl.textContent = updated + ' Nutzer repariert. ' + missing + ' Nutzer nicht gefunden (wurden auf einem anderen Gerät registriert – bitte dort ausführen).';
+    } else if (updated === 0) {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = '✓ Alle Nutzer sind bereits auf dem neuesten Stand.';
+    } else {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = '✓ ' + updated + ' Nutzer erfolgreich repariert!';
+    }
+  } catch(e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Fehler: ' + e.message;
+  }
 }
 
 async function saveCountdownDate(){
