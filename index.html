@@ -1283,6 +1283,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <button class="drop-item" id="drop-trainer-btn" style="display:none" onclick="closeProfileDrop();goTrainer()">👥 Trainer-Ansicht</button>
   <button class="drop-item" id="drop-admin-btn" style="display:none" onclick="closeProfileDrop();goAdmin()">⚙️ Admin-Bereich</button>
   <div class="drop-divider"></div>
+  <button class="drop-item" onclick="changeOwnPassword()">🔑 Passwort ändern</button>
   <button class="drop-item danger" onclick="logout()">🚪 Abmelden</button>
 </div>
 
@@ -2916,6 +2917,44 @@ async function logout() {
   store = { done:{}, stats:{}, dark:false, resume:null, bookmarks:{}, qstats:{}, history:[] };
   document.getElementById("user-pill").style.display = "none";
   showLoginScreen();
+}
+
+async function changeOwnPassword() {
+  closeProfileDrop();
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:360px;box-shadow:var(--shadow-lg);border:1px solid var(--border)">
+      <div style="font-family:Outfit,sans-serif;font-weight:800;font-size:17px;margin-bottom:.4rem">🔑 Passwort ändern</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:1.2rem">Neues Passwort für dein Konto setzen</div>
+      <input id="cpw-new" type="password" placeholder="Neues Passwort (min. 6 Zeichen)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:Inter,sans-serif;background:var(--bg3);color:var(--text);outline:none;margin-bottom:.75rem">
+      <input id="cpw-new2" type="password" placeholder="Passwort wiederholen" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:Inter,sans-serif;background:var(--bg3);color:var(--text);outline:none;margin-bottom:.5rem">
+      <div id="cpw-error" style="font-size:12px;color:var(--red);margin-bottom:.75rem;display:none"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;color:var(--text2)">Abbrechen</button>
+        <button id="cpw-confirm" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:8px 18px;font-size:13px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">Speichern</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.getElementById("cpw-confirm").onclick = async () => {
+    const pw = document.getElementById("cpw-new").value;
+    const pw2 = document.getElementById("cpw-new2").value;
+    const errEl = document.getElementById("cpw-error");
+    if (pw.length < 6) { errEl.textContent = "Mindestens 6 Zeichen."; errEl.style.display="block"; return; }
+    if (pw !== pw2) { errEl.textContent = "Passwörter stimmen nicht überein."; errEl.style.display="block"; return; }
+    const sb = await initSupabase();
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error) { errEl.textContent = "Fehler: " + error.message; errEl.style.display="block"; return; }
+    overlay.remove();
+    const toast = document.createElement("div");
+    toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)";
+    toast.textContent = "✓ Passwort erfolgreich geändert!";
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  };
+  document.getElementById("cpw-new").focus();
 }
 
 // ─── SAVE STORE (Supabase) ─────────────────────────────────
