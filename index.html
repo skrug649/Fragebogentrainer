@@ -2826,10 +2826,12 @@ async function doLogin() {
   let email = userRecord?.email;
   // If not found locally, fetch email from Supabase profiles table
   if (!email) {
-    const { data: profiles, error: profileError } = await sb.from("profiles").select("email").ilike("name", name);
+    const { data: profiles, error: profileError } = await sb.from("profiles").select("name, email").ilike("name", name);
     if (profileError) { showLoginError("Fehler beim Suchen [DB]: " + profileError.message); return; }
-    const profile = profiles && profiles.length > 0 ? profiles[0] : null;
-    if (!profile?.email) { showLoginError("Name gefunden, aber keine E-Mail gespeichert. Bitte Admin kontaktieren."); return; }
+    if (!profiles || profiles.length === 0) { showLoginError("Name nicht gefunden. Bitte prüfen."); return; }
+    const profile = profiles[0];
+    showLoginError("Debug: name=" + profile.name + " email=" + (profile.email || "LEER"));
+    if (!profile.email) { showLoginError("E-Mail fehlt in DB. Bitte SQL: UPDATE profiles SET email=... WHERE name=Stefan ausführen."); return; }
     email = profile.email;
     // Cache locally for next time
     users.push({ name, email });
