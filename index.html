@@ -2839,6 +2839,8 @@ async function loadProfile(user) {
       await sb.from("profiles").update({ pending_password: null }).eq("id", user.id);
     }
   }
+  // Save last login timestamp
+  await sb.from("profiles").update({ last_login: new Date().toISOString() }).eq("id", user.id);
   currentProfile = profile;
   store = { ...{ done:{}, stats:{}, dark:false, resume:null, bookmarks:{}, qstats:{}, history:[] }, ...(profile.store || {}) };
   onLogin();
@@ -3169,6 +3171,7 @@ function participantCardHTML(p) {
       <div style="flex:1">
         <div class="pc-name">${p.name}</div>
         <div class="pc-date">Dabei seit: ${new Date(p.created_at).toLocaleDateString("de-DE")}</div>
+        <div class="pc-date" style="color:${p.last_login ? (new Date()-new Date(p.last_login) > 7*86400000 ? 'var(--amber)' : 'var(--text3)') : 'var(--red)'}">Letzter Login: ${p.last_login ? new Date(p.last_login).toLocaleDateString("de-DE") + " " + new Date(p.last_login).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}) : "Noch nie"}</div>
         ${inactiveWarning}
       </div>
       <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${pctColor}">${pct}%</div>
@@ -3701,6 +3704,7 @@ function renderComparisonTable() {
         <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;color:${pctColor}">${pct}%</span>
       </td>
       <td style="text-align:center;font-size:12px;color:var(--text3);padding:6px 8px">${s.history?.length||0}</td>
+      <td style="text-align:center;font-size:11px;padding:6px 8px;color:var(--text3)">${p.last_login?new Date(p.last_login).toLocaleDateString("de-DE"):"–"}</td>
       ${themaCols}
     </tr>`;
   }).join("");
@@ -3712,6 +3716,7 @@ function renderComparisonTable() {
             <th style="text-align:left;padding:10px;font-size:12px;font-family:'Outfit',sans-serif">Teilnehmer</th>
             <th style="text-align:center;padding:6px 10px;font-size:12px;font-family:'Outfit',sans-serif">Gesamt</th>
             <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Sitzungen</th>
+            <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Letzter Login</th>
             ${headerCols}
           </tr>
         </thead>
