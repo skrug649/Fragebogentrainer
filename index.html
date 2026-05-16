@@ -3212,9 +3212,10 @@ function setTrainerView(view) {
   const empfehlungen = document.getElementById("trainer-empfehlungen");
   const pruefungEl = document.getElementById("trainer-pruefung");
   const anfragenEl = document.getElementById("trainer-anfragen");
+  const btnPruefung = document.getElementById("trainer-view-pruefung");
+  const btnAnfragen = document.getElementById("trainer-view-anfragen");
   [cards, table, auswertung, empfehlungen, pruefungEl, anfragenEl].forEach(el => { if(el) el.style.display = "none"; });
-  [btnCards, btnTable, btnAuswertung, btnEmpfehlungen].forEach(btn => { if(btn) { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; } });
-  [btnCards, btnTable, btnAuswertung, btnEmpfehlungen].forEach(btn => { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; });
+  [btnCards, btnTable, btnAuswertung, btnEmpfehlungen, btnPruefung, btnAnfragen].forEach(btn => { if(btn) { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; } });
   if (view === "cards") {
     cards.style.display = "block"; btnCards.className = "bp"; btnCards.style.fontSize = "12.5px"; btnCards.style.padding = "7px 12px";
   } else if (view === "table") {
@@ -3227,15 +3228,11 @@ function setTrainerView(view) {
     empfehlungen.style.display = "block"; btnEmpfehlungen.className = "bp"; btnEmpfehlungen.style.fontSize = "12.5px"; btnEmpfehlungen.style.padding = "7px 12px";
     renderEmpfehlungen();
   } else if (view === "pruefung") {
-    const pruefung = document.getElementById("trainer-pruefung");
-    pruefung.style.display = "block";
-    const btnPruefung = document.getElementById("trainer-view-pruefung");
+    pruefungEl.style.display = "block";
     btnPruefung.className = "bp"; btnPruefung.style.fontSize = "12.5px"; btnPruefung.style.padding = "7px 12px";
     renderPruefungsauswertung();
   } else if (view === "anfragen") {
-    const anfragen = document.getElementById("trainer-anfragen");
-    anfragen.style.display = "block";
-    const btnAnfragen = document.getElementById("trainer-view-anfragen");
+    anfragenEl.style.display = "block";
     btnAnfragen.className = "bp"; btnAnfragen.style.fontSize = "12.5px"; btnAnfragen.style.padding = "7px 12px";
     renderAnfragen();
   }
