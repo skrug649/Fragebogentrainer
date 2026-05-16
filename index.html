@@ -2567,7 +2567,7 @@ function showLoginSpinner(on) {
 
 async function loadProfile(user) {
   currentUser = user;
-  const sb = supabase;
+  const sb = supabaseClient;
   const { data: profile, error } = await sb.from("profiles").select("*").eq("id", user.id).single();
   if (error || !profile) { await sb.auth.signOut(); showLoginScreen(); return; }
   currentProfile = profile;
