@@ -2633,9 +2633,8 @@ async function doRegister() {
     if (code === (setting?.value || "trainer2024")) role = "trainer";
     else { showLoginError("Ungültiger Trainer-Code."); return; }
   }
-  // First user becomes admin
-  const { count } = await sb.from("profiles").select("id", { count: "exact", head: true });
-  if (count === 0) role = "admin";
+  // Role is always teilnehmer unless trainer code used
+  // Admin role is set manually via Supabase SQL
   // Generate unique valid email using timestamp
   const uid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   const email = uid + "@fragebogen.app";
