@@ -2825,15 +2825,17 @@ async function doLogin() {
   let email = userRecord?.email;
   // If not found locally, fetch email from Supabase profiles table
   if (!email) {
-    const { data: profile } = await sb.from("profiles").select("email").ilike("name", name).single();
-    if (!profile?.email) { showLoginError("Name nicht gefunden."); return; }
+    const { data: profile, error: profileError } = await sb.from("profiles").select("email").ilike("name", name).single();
+    if (profileError) { showLoginError("Fehler beim Suchen [DB]: " + profileError.message); return; }
+    if (!profile?.email) { showLoginError("Name gefunden, aber keine E-Mail gespeichert. Bitte Migration im Admin-Bereich erneut ausführen."); return; }
     email = profile.email;
     // Cache locally for next time
     users.push({ name, email });
     localStorage.setItem('fw_email_map', JSON.stringify(users));
   }
+  showLoginError("⏳ Versuche Login mit: " + email.substring(0,8) + "...");
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  if (error) { showLoginError("Name oder Passwort falsch."); return; }
+  if (error) { showLoginError("Login fehlgeschlagen [" + error.status + "]: " + error.message); return; }
   await loadProfile(data.user);
 }
 
