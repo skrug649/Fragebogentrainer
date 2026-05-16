@@ -2768,6 +2768,13 @@ async function loadProfile(user) {
   const sb = supabaseClient;
   const { data: profile, error } = await sb.from("profiles").select("*").eq("id", user.id).single();
   if (error || !profile) { await sb.auth.signOut(); showLoginScreen(); return; }
+  // Handle pending password reset set by admin
+  if (profile.pending_password) {
+    const { error: pwErr } = await sb.auth.updateUser({ password: profile.pending_password });
+    if (!pwErr) {
+      await sb.from("profiles").update({ pending_password: null }).eq("id", user.id);
+    }
+  }
   currentProfile = profile;
   store = { ...{ done:{}, stats:{}, dark:false, resume:null, bookmarks:{}, qstats:{}, history:[] }, ...(profile.store || {}) };
   onLogin();
@@ -3186,6 +3193,7 @@ async function renderAdminUserList() {
           <option value="trainer"${u.role==="trainer"?" selected":""}>Trainer</option>
           <option value="admin"${u.role==="admin"?" selected":""}>Admin</option>
         </select>
+        <button onclick="resetPassword('${u.id}','${u.name}')" style="background:var(--blue-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--blue);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">🔑 Passwort</button>
         <button onclick="deleteUser('${u.id}','${u.name}')" style="background:var(--red-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--red-d);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">Loeschen</button>`
         : `<span style="font-size:12px;color:var(--text3)">Eigenes Konto</span>`}
       </div>
@@ -3202,6 +3210,49 @@ async function deleteUser(id, name) {
   const sb = await initSupabase();
   await sb.from("profiles").delete().eq("id", id);
   await renderAdminUserList(); await loadAllParticipantsAdmin();
+}
+
+async function resetPassword(id, name) {
+  // Show custom modal
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem';
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:360px;box-shadow:var(--shadow-lg);border:1px solid var(--border)">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:17px;margin-bottom:.4rem">🔑 Passwort zurücksetzen</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:1.2rem">Neues Passwort für <strong style="color:var(--text)">${name}</strong></div>
+      <input id="reset-pw-input" type="password" placeholder="Neues Passwort (min. 6 Zeichen)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Inter',sans-serif;background:var(--bg3);color:var(--text);outline:none;margin-bottom:.75rem">
+      <input id="reset-pw-input2" type="password" placeholder="Passwort wiederholen" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Inter',sans-serif;background:var(--bg3);color:var(--text);outline:none;margin-bottom:.5rem">
+      <div id="reset-pw-error" style="font-size:12px;color:var(--red);margin-bottom:.75rem;display:none"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="reset-pw-cancel" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700;color:var(--text2)">Abbrechen</button>
+        <button id="reset-pw-confirm" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:8px 18px;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">Speichern</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const input = document.getElementById('reset-pw-input');
+  const input2 = document.getElementById('reset-pw-input2');
+  const errEl = document.getElementById('reset-pw-error');
+  const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+  document.getElementById('reset-pw-cancel').onclick = () => overlay.remove();
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.getElementById('reset-pw-confirm').onclick = async () => {
+    const newPw = input.value;
+    const newPw2 = input2.value;
+    if (newPw.length < 6) { showErr('Passwort muss mindestens 6 Zeichen haben.'); return; }
+    if (newPw !== newPw2) { showErr('Passwörter stimmen nicht überein.'); return; }
+    const sb = await initSupabase();
+    const { error } = await sb.from('profiles').update({ pending_password: newPw }).eq('id', id);
+    if (error) { showErr('Fehler: ' + error.message); return; }
+    overlay.remove();
+    // Show success
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+    toast.textContent = '✓ Passwort für ' + name + ' gespeichert';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  };
+  input.focus();
 }
 
 async function saveCountdownDate(){
