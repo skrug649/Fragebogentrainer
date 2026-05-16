@@ -2538,6 +2538,10 @@ async function initSupabase() {
 let currentUser = null;
 let currentProfile = null;
 
+
+function getLocalUsers(){
+  try{return JSON.parse(localStorage.getItem('fw_email_map')||'[]')}catch(e){return[]}
+}
 // ─── INIT ──────────────────────────────────────────────────
 async function initUserSystem() {
   showLoginSpinner(true);
@@ -2600,7 +2604,11 @@ async function doLogin() {
   const pw = document.getElementById("li-pw").value;
   if (!name || !pw) { showLoginError("Bitte Name und Passwort eingeben."); return; }
   const sb = await initSupabase();
-  const email = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") + "@gmail.com";
+  // Use stored email for this user
+  const users = getLocalUsers();
+  const userRecord = users.find(u => u.name.toLowerCase() === name.toLowerCase());
+  if (!userRecord) { showLoginError("Name nicht gefunden."); return; }
+  const email = userRecord.email;
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
   if (error) { showLoginError("Name oder Passwort falsch."); return; }
   await loadProfile(data.user);
@@ -2628,7 +2636,13 @@ async function doRegister() {
   // First user becomes admin
   const { count } = await sb.from("profiles").select("id", { count: "exact", head: true });
   if (count === 0) role = "admin";
-  const email = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") + "@gmail.com";
+  // Generate unique valid email using timestamp
+  const uid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const email = uid + "@fragebogen.app";
+  // Store locally so login can find it
+  const localUsers = getLocalUsers();
+  localUsers.push({name, email});
+  localStorage.setItem('fw_email_map', JSON.stringify(localUsers));
   const { data, error } = await sb.auth.signUp({
     email, password: pw,
     options: { data: { name, role } }
