@@ -3656,7 +3656,7 @@ async function changeUserRole(id, role) {
   await renderAdminUserList();
 }
 async function deleteUser(id, name) {
-  if (!confirm("Nutzer "" + name + "" wirklich löschen?")) return;
+  if (!confirm("Nutzer " + name + " wirklich loeschen?")) return;
   const sb = await initSupabase();
   const { error } = await sb.from("profiles").delete().eq("id", id);
   if (error) { alert("Fehler beim Löschen: " + error.message); return; }
