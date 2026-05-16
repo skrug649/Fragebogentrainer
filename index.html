@@ -8,6 +8,7 @@
 <style>
 /* ─── RESET & BASE ─────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;max-width:100vw}
 :root{
   --bg:#f5f5f5;
   --bg2:#ffffff;
@@ -285,7 +286,7 @@ body.dark .fi.active .fc{background:rgba(217,48,37,.25);color:#ff9090}
   background:radial-gradient(circle,rgba(255,255,255,.1) 0%,transparent 65%);
   border-radius:50%;pointer-events:none;
 }
-.hero-left{position:relative;z-index:1;flex:1;min-width:180px}
+.hero-left{position:relative;z-index:1;flex:1;min-width:0}
 .hero-right{position:relative;z-index:1;display:flex;align-items:center;gap:.75rem;flex-shrink:0;flex-wrap:wrap}
 .hey{
   font-size:10px;letter-spacing:2px;text-transform:uppercase;
@@ -1211,6 +1212,13 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
   .nav-btns{display:none}
   .bottom-nav{display:block}
   .tg{grid-template-columns:1fr;gap:.6rem}
+  .home-widgets-grid{grid-template-columns:1fr 1fr!important}
+  .hero{padding:.85rem 1rem}
+  .hero h1{font-size:14px}
+  .hero-stats{gap:.3rem}
+  .hero-stat{min-width:40px;padding:.3rem .4rem}
+  .hero-stat-n{font-size:15px}
+  .app{overflow-x:hidden}
   .tc{padding:.85rem}
   .trainer-grid{grid-template-columns:1fr}
   .stat-grid{grid-template-columns:1fr}
@@ -1399,12 +1407,21 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   </div>
   <!-- Trainer code management -->
   <div class="admin-section">
-    <div class="admin-section-title">⏰ Kreisübung-Datum verwalten</div>
-    <div class="admin-section-sub">Das Datum wird für alle Teilnehmer als Countdown angezeigt.</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input type="date" id="admin-countdown-date" class="login-input" style="max-width:200px;background:var(--bg3);border-color:var(--border);color:var(--text)">
-      <button class="bp" onclick="saveCountdownDate()">Speichern</button>
-      <span id="countdown-date-display" style="font-size:12.5px;color:var(--text3)"></span>
+    <div class="admin-section-title">⏰ Kreisübung-Countdown verwalten</div>
+    <div class="admin-section-sub">Titel und Datum des Countdowns für alle Teilnehmer festlegen.</div>
+    <div style="display:flex;flex-direction:column;gap:.75rem;max-width:480px">
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text3);display:block;margin-bottom:4px">Titel (z.B. "Kreisübung Waldeck-Frankenberg 2026")</label>
+        <input class="login-input" id="admin-countdown-text" style="background:var(--bg3);border-color:var(--border);color:var(--text)" placeholder="Kreisübung Waldeck-Frankenberg 2026">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text3);display:block;margin-bottom:4px">Datum</label>
+        <input type="date" id="admin-countdown-date" class="login-input" style="max-width:200px;background:var(--bg3);border-color:var(--border);color:var(--text)">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="bp" onclick="saveCountdownDate()">Speichern</button>
+        <span id="countdown-date-display" style="font-size:12.5px;color:var(--text3)"></span>
+      </div>
     </div>
   </div>
 
@@ -1482,7 +1499,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 </div>
 
 <!-- Countdown + Tagesaufgabe + Bestleistung -->
-<div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem"></div>
+<div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem" class="home-widgets-grid"></div>
 
 <!-- Fortschritt + Schnellzugriff: 2-Spalten -->
 <div class="home-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
@@ -1548,8 +1565,8 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div class="filter-divider"></div>
 <div class="filter-section">
 <span class="filter-label">Reihenfolge</span>
-<button class="filter-chip active" id="order-zufall" onclick="setOrder('zufall')">🔀 Zufall</button>
-<button class="filter-chip" id="order-reihenfolge" onclick="setOrder('reihenfolge')">📋 Sortiert</button>
+<button class="filter-chip" id="order-zufall" onclick="setOrder('zufall')">🔀 Zufall</button>
+<button class="filter-chip active" id="order-reihenfolge" onclick="setOrder('reihenfolge')">📋 Sortiert</button>
 </div>
 </div>
 
@@ -1756,7 +1773,7 @@ function toggleDark(){
 if(store.dark){document.body.classList.add("dark");document.getElementById("dark-btn").textContent="☀️";}
 
 // QUIZ STATE
-let filt=[...ALL],quiz=[],idx=0,answered=false,results=[],mode="alle",thema="alle",order="zufall",answerOrder="zufall";
+let filt=[...ALL],quiz=[],idx=0,answered=false,results=[],mode="alle",thema="alle",order="reihenfolge",answerOrder="original";
 
 
 
@@ -2410,17 +2427,20 @@ function renderWidgets(){
     </button>
   </div>`);
   const cd=getCountdown();
-  widgets.push(`<div class="widget-card">
-    <div class="widget-title">⏰ Countdown</div>
-    ${cd?cd.done?`<div class="widget-value" style="color:var(--red)">Heute!</div>`:
-    `<div class="countdown-grid" id="cd-grid">
-      <div class="countdown-box"><div class="countdown-n" id="cd-d">${cd.days}</div><div class="countdown-l">Tage</div></div>
-      <div class="countdown-box"><div class="countdown-n" id="cd-h">${cd.hours}</div><div class="countdown-l">Std</div></div>
-      <div class="countdown-box"><div class="countdown-n" id="cd-m">${cd.mins}</div><div class="countdown-l">Min</div></div>
-      <div class="countdown-box"><div class="countdown-n" id="cd-s">${cd.secs}</div><div class="countdown-l">Sek</div></div>
+  const cdText=store.countdownText||"Kreisübung";
+  const isTrainerOrAdmin=currentProfile&&(currentProfile.role==="trainer"||currentProfile.role==="admin");
+  widgets.push(`<div class="widget-card" style="grid-column:span 1">
+    <div class="widget-title" style="font-size:10px;letter-spacing:1.5px">⏰ COUNTDOWN</div>
+    <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;color:var(--text);margin:4px 0 8px;line-height:1.2">${cdText}</div>
+    ${cd?cd.done?`<div class="widget-value" style="color:var(--red);font-size:32px">Heute!</div>`:
+    `<div class="countdown-grid" id="cd-grid" style="gap:6px;margin:4px 0 10px">
+      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-d" style="font-size:28px">${cd.days}</div><div class="countdown-l">Tage</div></div>
+      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-h" style="font-size:28px">${cd.hours}</div><div class="countdown-l">Std</div></div>
+      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-m" style="font-size:28px">${cd.mins}</div><div class="countdown-l">Min</div></div>
+      <div class="countdown-box" style="padding:10px 6px"><div class="countdown-n" id="cd-s" style="font-size:28px">${cd.secs}</div><div class="countdown-l">Sek</div></div>
     </div>`:`<div class="widget-value" style="font-size:20px;color:var(--text3)">–</div>
     <div class="widget-sub">Kein Datum gesetzt</div>`}
-    <button class="widget-action" onclick="setCountdownDate()">📅 ${cd?"Datum ändern":"Datum eintragen"}</button>
+    ${isTrainerOrAdmin?`<button class="widget-action" onclick="goAdmin()">📅 Datum & Text ändern</button>`:""}
   </div>`);
   const best=getBestResult();
   widgets.push(`<div class="widget-card">
@@ -3600,6 +3620,10 @@ async function goAdmin() {
     document.getElementById("admin-countdown-date").value=cd.value;
     document.getElementById("countdown-date-display").textContent="Aktuell: "+new Date(cd.value).toLocaleDateString("de-DE");
   }
+  const {data:ct}=await sb.from("settings").select("value").eq("key","countdown_text").single().catch(()=>({data:null}));
+  if(ct?.value && document.getElementById("admin-countdown-text")){
+    document.getElementById("admin-countdown-text").value=ct.value;
+  }
 }
 function closeAdmin() { document.getElementById("screen-admin").style.display = "none"; window.scrollTo(0,0); }
 
@@ -3750,19 +3774,26 @@ async function runEmailMigration() {
 
 async function saveCountdownDate(){
   const d=document.getElementById("admin-countdown-date").value;
+  const t=document.getElementById("admin-countdown-text")?.value.trim()||"";
   if(!d){alert("Bitte ein Datum auswählen.");return;}
   const sb=await initSupabase();
   await sb.from("settings").upsert({key:"countdown_date",value:d});
-  document.getElementById("countdown-date-display").textContent="Gespeichert: "+new Date(d).toLocaleDateString("de-DE");
-  store.countdownDate=d;saveStore();renderWidgets();
-  alert("Datum gespeichert – alle Teilnehmer sehen jetzt den Countdown!");
+  if(t) await sb.from("settings").upsert({key:"countdown_text",value:t});
+  document.getElementById("countdown-date-display").textContent="Gespeichert: "+(t?t+" · ":"")+new Date(d).toLocaleDateString("de-DE");
+  store.countdownDate=d;
+  store.countdownText=t||store.countdownText||"";
+  saveStore();renderWidgets();
+  alert("Countdown gespeichert!");
 }
 
 async function loadCountdownDate(){
   try{
     const sb=await initSupabase();
     const {data}=await sb.from("settings").select("value").eq("key","countdown_date").single();
-    if(data?.value){store.countdownDate=data.value;renderWidgets();}
+    if(data?.value){store.countdownDate=data.value;}
+    const {data:td}=await sb.from("settings").select("value").eq("key","countdown_text").single().catch(()=>({data:null}));
+    if(td?.value){store.countdownText=td.value;}
+    if(store.countdownDate)renderWidgets();
   }catch(e){}
 }
 
