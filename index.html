@@ -3092,9 +3092,13 @@ function participantCardHTML(p) {
     </div>`).join("");
 
   const days = daysSinceLastActivity(p);
-  const inactiveWarning = days !== null && days > 7 ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--amber)">⚠️ ${days} Tage inaktiv</div>` : "";
+  const isInactive = days !== null && days > 7;
+  const neverActive = !p.store?.history?.length;
+  const inactiveWarning = isInactive ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--amber)">⚠️ ${days} Tage nicht geübt</div>`
+    : neverActive ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--red)">🔴 Noch nie geübt</div>` : "";
+  const cardBorder = isInactive ? "border-color:rgba(230,81,0,.5);" : neverActive ? "border-color:rgba(204,0,0,.4);" : "";
 
-  return `<div class="participant-card">
+  return `<div class="participant-card" style="${cardBorder}">
     <div class="pc-head">
       <div class="pc-avatar">${p.name.charAt(0).toUpperCase()}</div>
       <div style="flex:1">
@@ -3170,6 +3174,8 @@ function renderGroupProgress() {
   const avgPct = totalQ ? Math.round(avgDone / totalQ * 100) : 0;
   const correctPct = totalAnswers ? Math.round(totalCorrect / totalAnswers * 100) : 0;
   const pctColor = p => p >= 80 ? "var(--green)" : p >= 50 ? "var(--amber)" : "var(--red)";
+  const inactiveCount = trainerParticipants.filter(p => { const d = daysSinceLastActivity(p); return d !== null && d > 7; }).length;
+  const neverCount = trainerParticipants.filter(p => !p.store?.history?.length).length;
 
   // Countdown
   let countdownHTML = "";
@@ -3215,6 +3221,14 @@ function renderGroupProgress() {
           <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:var(--text);line-height:1">${totalAnswers}</div>
         </div>
         ${countdownHTML}
+        <div style="text-align:center;padding:.75rem 1.25rem;background:var(--bg3);border-radius:var(--radius-md);border:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Inaktiv >7 Tage</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${inactiveCount > 0 ? 'var(--amber)' : 'var(--green)'};line-height:1">${inactiveCount}</div>
+        </div>
+        <div style="text-align:center;padding:.75rem 1.25rem;background:var(--bg3);border-radius:var(--radius-md);border:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Noch nie geübt</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${neverCount > 0 ? 'var(--red)' : 'var(--green)'};line-height:1">${neverCount}</div>
+        </div>
       </div>
     </div>
   `;
