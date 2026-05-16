@@ -1389,6 +1389,16 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   </div>
   <!-- Trainer code management -->
   <div class="admin-section">
+    <div class="admin-section-title">⏰ Kreisübung-Datum verwalten</div>
+    <div class="admin-section-sub">Das Datum wird für alle Teilnehmer als Countdown angezeigt.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="admin-countdown-date" class="login-input" style="max-width:200px;background:var(--bg3);border-color:var(--border);color:var(--text)">
+      <button class="bp" onclick="saveCountdownDate()">Speichern</button>
+      <span id="countdown-date-display" style="font-size:12.5px;color:var(--text3)"></span>
+    </div>
+  </div>
+
+  <div class="admin-section">
     <div class="admin-section-title">🔑 Trainer-Code verwalten</div>
     <div class="admin-section-sub">Mit diesem Code können sich neue Nutzer als Trainer registrieren.</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -2867,6 +2877,7 @@ function onLogin() {
   loadCustomCatalog();
   applyF(); updBookmarkSidebar(); renderResumeBanner();
   updateStreak(); renderWidgets();
+  loadCountdownDate();
 }
 
 async function logout() {
@@ -3123,6 +3134,12 @@ async function goAdmin() {
   const tc = data?.value || "trainer2024";
   document.getElementById("trainer-code-display").textContent = "Aktuell: " + tc;
   document.getElementById("admin-trainer-code").value = tc;
+  // Load countdown date
+  const {data:cd}=await sb.from("settings").select("value").eq("key","countdown_date").single().catch(()=>({data:null}));
+  if(cd?.value){
+    document.getElementById("admin-countdown-date").value=cd.value;
+    document.getElementById("countdown-date-display").textContent="Aktuell: "+new Date(cd.value).toLocaleDateString("de-DE");
+  }
 }
 function closeAdmin() { document.getElementById("screen-admin").style.display = "none"; }
 
@@ -3177,6 +3194,25 @@ async function deleteUser(id, name) {
   await sb.from("profiles").delete().eq("id", id);
   await renderAdminUserList(); await loadAllParticipantsAdmin();
 }
+
+async function saveCountdownDate(){
+  const d=document.getElementById("admin-countdown-date").value;
+  if(!d){alert("Bitte ein Datum auswählen.");return;}
+  const sb=await initSupabase();
+  await sb.from("settings").upsert({key:"countdown_date",value:d});
+  document.getElementById("countdown-date-display").textContent="Gespeichert: "+new Date(d).toLocaleDateString("de-DE");
+  store.countdownDate=d;saveStore();renderWidgets();
+  alert("Datum gespeichert – alle Teilnehmer sehen jetzt den Countdown!");
+}
+
+async function loadCountdownDate(){
+  try{
+    const sb=await initSupabase();
+    const {data}=await sb.from("settings").select("value").eq("key","countdown_date").single();
+    if(data?.value){store.countdownDate=data.value;renderWidgets();}
+  }catch(e){}
+}
+
 async function saveTrainerCode() {
   const c = document.getElementById("admin-trainer-code").value.trim();
   if (!c) { alert("Code darf nicht leer sein."); return; }
