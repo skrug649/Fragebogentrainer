@@ -1213,6 +1213,7 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
   .bottom-nav{display:block}
   .tg{grid-template-columns:1fr;gap:.6rem}
   .home-widgets-grid{grid-template-columns:1fr 1fr!important}
+  .trainer-auswertung-grid{grid-template-columns:1fr!important}
   .hero{padding:.85rem 1rem;flex-direction:column;align-items:stretch}
   .hero h1{font-size:14px}
   .hero-right{flex-direction:row;justify-content:space-between;width:100%}
@@ -1444,22 +1445,24 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 
 <!-- TRAINER SCREEN -->
 <div id="screen-trainer" style="display:none;max-width:1400px;margin:0 auto;padding:1.5rem">
-  <div class="page-header">
+  <div class="page-header" style="flex-wrap:wrap;gap:.75rem">
     <div style="display:flex;align-items:center;gap:10px">
       <button class="qbk" onclick="closeTrainer()">← Zurück</button>
       <div class="page-title">👥 Trainer-Ansicht</div>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="bse" id="trainer-view-cards" onclick="setTrainerView('cards')" style="font-size:12.5px;padding:7px 12px">🃏 Karten</button>
-      <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:12.5px;padding:7px 12px">📊 Vergleich</button>
-      <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:12.5px;padding:7px 12px">🔍 Schwachstellen</button>
-      <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:12.5px;padding:7px 12px">💡 Empfehlungen</button>
-      <button class="bse" id="trainer-view-anfragen" onclick="setTrainerView('anfragen')" style="font-size:12.5px;padding:7px 12px">❓ Anfragen <span id="anfragen-badge" style="display:none;background:var(--red);color:white;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:3px">0</span></button>
-      <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:12.5px;padding:7px 12px">🎯 Prüfungen</button>
-      <button class="bp" onclick="loadAllParticipants()">🔄 Aktualisieren</button>
-      <button class="bse" onclick="exportPDF()" style="font-size:12.5px;padding:7px 12px">📄 PDF Export</button>
-      <button class="bse" onclick="openBeamer()" style="font-size:12.5px;padding:7px 12px;background:#1a1a1a;color:white;border-color:#444">📽️ Beamer</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="bp" onclick="loadAllParticipants()" style="font-size:12.5px;padding:7px 12px">🔄</button>
+      <button class="bse" onclick="exportPDF()" style="font-size:12.5px;padding:7px 12px">📄</button>
+      <button class="bse" onclick="openBeamer()" style="font-size:12.5px;padding:7px 12px;background:#1a1a1a;color:white;border-color:#444">📽️</button>
     </div>
+  </div>
+  <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:.75rem;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+    <button class="bse" id="trainer-view-cards" onclick="setTrainerView('cards')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">🃏 Karten</button>
+    <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">📊 Vergleich</button>
+    <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">🔍 Schwachstellen</button>
+    <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">💡 Empfehlungen</button>
+    <button class="bse" id="trainer-view-anfragen" onclick="setTrainerView('anfragen')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">❓ Anfragen <span id="anfragen-badge" style="display:none;background:var(--red);color:white;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:3px">0</span></button>
+    <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">🎯 Prüfungen</button>
   </div>
   <!-- Gruppenfortschritt -->
   <div id="trainer-group-progress" style="margin-bottom:1.25rem"></div>
@@ -2188,11 +2191,23 @@ function showResults(){
   incrementStreak();
   completeDailyTask();
   renderWidgets();
-  // Save to session history (keep last 10)
+  // Save to session history only if >= 10 questions
   if(!store.history)store.history=[];
   const cor=results.filter(r=>r.ok).length,tot=results.length,pct=Math.round(cor/tot*100);
-  store.history.unshift({date:new Date().toLocaleDateString("de-DE"),thema:thema==="alle"?"Alle Themen":thema,cor,tot,pct});
-  if(store.history.length>10)store.history.pop();
+  if(tot >= 10) {
+    store.history.unshift({date:new Date().toLocaleDateString("de-DE"),thema:thema==="alle"?"Alle Themen":thema,cor,tot,pct});
+    if(store.history.length>10)store.history.pop();
+  }
+  // Save last 10 wrong questions
+  if(!store.recentWrong)store.recentWrong=[];
+  const wrongQs = results.filter(r=>!r.ok).map(r=>({
+    qk: qKey(r.q),
+    frage: r.q.frage,
+    thema: r.q.thema,
+    korrekt: r.q.antworten.find(a=>a.korrekt)?.text||"",
+    date: new Date().toLocaleDateString("de-DE")
+  }));
+  store.recentWrong = [...wrongQs, ...store.recentWrong].slice(0, 10);
   saveStore();
   // Remove lernmodus badge if present
   const badge=document.getElementById("lm-badge");if(badge)badge.remove();
@@ -3278,6 +3293,22 @@ function participantCardHTML(p) {
       <summary style="font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif;list-style:none">▸ Alle Sitzungen (${hist.length})</summary>
       <div style="margin-top:6px">${allHistRows}</div>
     </details>` : ""}
+    ${s.recentWrong?.length ? `<details style="margin-top:.6rem">
+      <summary style="font-size:12px;font-weight:700;color:var(--red-d);cursor:pointer;font-family:'Outfit',sans-serif;list-style:none">❌ Zuletzt falsch beantwortet (${s.recentWrong.length})</summary>
+      <div style="margin-top:6px">
+        ${s.recentWrong.map(w => `
+          <div style="padding:6px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:2px">
+              <span style="font-size:11.5px;color:var(--text2);flex:1">${w.frage.length>70?w.frage.slice(0,70)+"…":w.frage}</span>
+              <span style="font-size:10px;color:var(--text3);flex-shrink:0">${w.date}</span>
+            </div>
+            <div style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:4px">
+              <span>✓</span><span>${w.korrekt.length>50?w.korrekt.slice(0,50)+"…":w.korrekt}</span>
+            </div>
+            <div style="font-size:10.5px;color:var(--text3);margin-top:1px">${ICONS[w.thema]||"📋"} ${w.thema}</div>
+          </div>`).join("")}
+      </div>
+    </details>` : ""}
   </div>`;
 }
 
@@ -3901,7 +3932,7 @@ function renderAuswertung() {
   `).join("") : "<div style='color:var(--text3);font-size:13px'>Noch nicht genug Daten (mind. 3 Antworten pro Frage nötig).</div>";
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem" class="trainer-auswertung-grid">
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
           ⚠️ Schwache Themen
