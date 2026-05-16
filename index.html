@@ -2648,7 +2648,17 @@ async function doRegister() {
     options: { data: { name, role } }
   });
   if (error) { showLoginError("Fehler: " + error.message); return; }
-  if (data.user) await loadProfile(data.user);
+  if (data.user) {
+    // Manually create profile
+    const sb2 = supabaseClient;
+    await sb2.from("profiles").upsert({
+      id: data.user.id,
+      name: name,
+      role: role,
+      store: {}
+    });
+    await loadProfile(data.user);
+  }
 }
 
 // ─── ON LOGIN ──────────────────────────────────────────────
