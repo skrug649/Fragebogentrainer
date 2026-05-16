@@ -985,7 +985,7 @@ body.dark .login-hint strong{color:var(--text)}
 
 /* ─── PROFILE DROPDOWN ─────────────────────────────────── */
 .profile-drop{
-  position:absolute;top:64px;right:1.5rem;
+  position:fixed;top:64px;right:1.5rem;
   background:var(--bg2);border:1px solid var(--border);
   border-radius:var(--radius-lg);
   padding:.4rem;
@@ -1194,7 +1194,7 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
 
 /* ─── RESPONSIVE ───────────────────────────────────────── */
 @media(max-width:860px){
-  .app{padding:1.25rem 1.25rem 80px}
+  .app{padding:.75rem .75rem 80px}
   .hi{padding:0 .85rem;height:52px}
   .logo-title{font-size:11px}
   .logo-sub{display:none}
@@ -1210,7 +1210,7 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
   .form-row{grid-template-columns:1fr}
   .nav-btns{display:none}
   .bottom-nav{display:block}
-  .tg{grid-template-columns:repeat(2,1fr);gap:.6rem}
+  .tg{grid-template-columns:1fr;gap:.6rem}
   .tc{padding:.85rem}
   .trainer-grid{grid-template-columns:1fr}
   .stat-grid{grid-template-columns:1fr}
@@ -1368,7 +1368,9 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:12.5px;padding:7px 12px">📊 Vergleich</button>
       <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:12.5px;padding:7px 12px">🔍 Schwachstellen</button>
       <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:12.5px;padding:7px 12px">💡 Empfehlungen</button>
+      <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:12.5px;padding:7px 12px">🎯 Prüfungen</button>
       <button class="bp" onclick="loadAllParticipants()">🔄 Aktualisieren</button>
+      <button class="bse" onclick="exportPDF()" style="font-size:12.5px;padding:7px 12px">📄 PDF Export</button>
     </div>
   </div>
   <!-- Gruppenfortschritt -->
@@ -1384,6 +1386,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div id="trainer-table" style="display:none"></div>
   <div id="trainer-auswertung" style="display:none"></div>
   <div id="trainer-empfehlungen" style="display:none"></div>
+  <div id="trainer-pruefung" style="display:none"></div>
 </div>
 
 <!-- ADMIN SCREEN -->
@@ -2561,6 +2564,11 @@ function finishExam(){
   document.getElementById("exam-quiz-wrap").style.display="none";
   document.getElementById("exam-result-wrap").style.display="block";
   const cor=examAnswers.filter(a=>a.ok).length,tot=examAnswers.length,pct=Math.round(cor/tot*100);
+  // Save exam result to store
+  if(!store.examHistory)store.examHistory=[];
+  store.examHistory.unshift({date:new Date().toLocaleDateString("de-DE"),dateISO:new Date().toISOString(),cor,tot,pct,answers:examAnswers.map(a=>({qk:`${a.q.thema}|${a.q.nr}|${a.q.stufe}`,ok:a.ok}))});
+  if(store.examHistory.length>20)store.examHistory.pop();
+  saveStore();
   let em,ti,su;
   if(pct>=90){em="🏆";ti="Ausgezeichnet!";su="Sehr starke Leistung!"}
   else if(pct>=70){em="💪";ti="Sehr gut!";su="Du bist gut vorbereitet!"}
@@ -2857,8 +2865,8 @@ async function doRegister() {
   if (pw !== pw2) { showLoginError("Passwörter stimmen nicht überein."); return; }
   const sb = await initSupabase();
   // Check name not taken
-  const { data: existing } = await sb.from("profiles").select("id").ilike("name", name);
-  if (existing && existing.length) { showLoginError("Dieser Name ist bereits vergeben."); return; }
+  const { data: existing } = await sb.from("profiles").select("id, name").ilike("name", name);
+  if (existing && existing.length > 0) { showLoginError("Dieser Name ist bereits vergeben. Bitte einen anderen Namen wählen."); return; }
   // Determine role
   let role = "teilnehmer";
   if (code) {
@@ -2990,12 +2998,14 @@ function exportProgress() {
 // ─── TRAINER VIEW ──────────────────────────────────────────
 let trainerParticipants = [];
 async function goTrainer() {
+  document.getElementById("screen-admin").style.display = "none";
   document.getElementById("screen-trainer").style.display = "block";
+  window.scrollTo(0, 0);
   renderGroupProgress();
   document.getElementById("trainer-list").innerHTML = "<div style='color:var(--text3);padding:1rem 0;font-size:13px'>Lade Teilnehmer...</div>";
   await loadAllParticipants();
 }
-function closeTrainer() { document.getElementById("screen-trainer").style.display = "none"; }
+function closeTrainer() { document.getElementById("screen-trainer").style.display = "none"; window.scrollTo(0,0); }
 
 async function loadAllParticipants() {
   const sb = await initSupabase();
@@ -3141,7 +3151,8 @@ function setTrainerView(view) {
   const btnAuswertung = document.getElementById("trainer-view-auswertung");
   const btnEmpfehlungen = document.getElementById("trainer-view-empfehlungen");
   const empfehlungen = document.getElementById("trainer-empfehlungen");
-  [cards, table, auswertung, empfehlungen].forEach(el => el.style.display = "none");
+  const pruefungEl = document.getElementById("trainer-pruefung");
+  [cards, table, auswertung, empfehlungen, pruefungEl].forEach(el => { if(el) el.style.display = "none"; });
   [btnCards, btnTable, btnAuswertung, btnEmpfehlungen].forEach(btn => { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; });
   if (view === "cards") {
     cards.style.display = "block"; btnCards.className = "bp"; btnCards.style.fontSize = "12.5px"; btnCards.style.padding = "7px 12px";
@@ -3154,6 +3165,12 @@ function setTrainerView(view) {
   } else if (view === "empfehlungen") {
     empfehlungen.style.display = "block"; btnEmpfehlungen.className = "bp"; btnEmpfehlungen.style.fontSize = "12.5px"; btnEmpfehlungen.style.padding = "7px 12px";
     renderEmpfehlungen();
+  } else if (view === "pruefung") {
+    const pruefung = document.getElementById("trainer-pruefung");
+    pruefung.style.display = "block";
+    const btnPruefung = document.getElementById("trainer-view-pruefung");
+    btnPruefung.className = "bp"; btnPruefung.style.fontSize = "12.5px"; btnPruefung.style.padding = "7px 12px";
+    renderPruefungsauswertung();
   }
 }
 
@@ -3233,6 +3250,65 @@ function renderGroupProgress() {
           <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${neverCount > 0 ? 'var(--red)' : 'var(--green)'};line-height:1">${neverCount}</div>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function renderPruefungsauswertung() {
+  const el = document.getElementById("trainer-pruefung");
+  if (!trainerParticipants.length) { el.innerHTML = "<div style='color:var(--text3);padding:1rem'>Keine Teilnehmer vorhanden.</div>"; return; }
+
+  const rows = trainerParticipants
+    .filter(p => p.store?.examHistory?.length)
+    .map(p => {
+      const hist = p.store.examHistory;
+      const last = hist[0];
+      const best = hist.reduce((b, h) => h.pct > b.pct ? h : b, hist[0]);
+      const avg = Math.round(hist.reduce((s, h) => s + h.pct, 0) / hist.length);
+      const trend = hist.length >= 2 ? hist[0].pct - hist[1].pct : null;
+      const trendHTML = trend !== null ? `<span style="font-size:12px;font-weight:700;color:${trend > 0 ? 'var(--green)' : trend < 0 ? 'var(--red)' : 'var(--text3)'}">${trend > 0 ? '▲' : trend < 0 ? '▼' : '–'}${Math.abs(trend)}%</span>` : "";
+      const pctColor = p => p >= 70 ? "var(--green)" : p >= 50 ? "var(--amber)" : "var(--red)";
+      return `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px;font-weight:700;font-size:13px;font-family:'Outfit',sans-serif">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="pc-avatar" style="width:28px;height:28px;font-size:11px">${p.name.charAt(0).toUpperCase()}</div>
+              ${p.name}
+            </div>
+          </td>
+          <td style="text-align:center;padding:8px"><span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:${pctColor(last.pct)}">${last.pct}%</span><div style="font-size:10px;color:var(--text3)">${last.date}</div></td>
+          <td style="text-align:center;padding:8px"><span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:${pctColor(best.pct)}">${best.pct}%</span></td>
+          <td style="text-align:center;padding:8px"><span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:${pctColor(avg)}">${avg}%</span></td>
+          <td style="text-align:center;padding:8px">${trendHTML}</td>
+          <td style="text-align:center;padding:8px;font-size:12px;color:var(--text3)">${hist.length}×</td>
+          <td style="text-align:center;padding:8px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:${last.pct>=70?'var(--green-l)':'var(--red-l)'};color:${last.pct>=70?'var(--green-d)':'var(--red-d)'}">${last.pct>=70?'✓ Bestanden':'✗ Nicht bestanden'}</span></td>
+        </tr>`;
+    }).join("");
+
+  const noData = trainerParticipants.filter(p => !p.store?.examHistory?.length);
+
+  el.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem">🎯 Prüfungssimulation – Ergebnisse</div>
+      ${rows ? `<div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
+              <th style="text-align:left;padding:8px 10px;font-size:12px;font-family:'Outfit',sans-serif">Teilnehmer</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Letzter</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Bester</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Ø Schnitt</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Trend</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Versuche</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : "<div style='color:var(--text3);font-size:13px;padding:.5rem 0'>Noch keine Prüfungsergebnisse vorhanden.</div>"}
+      ${noData.length ? `<div style="margin-top:1rem;padding:.75rem;background:var(--bg3);border-radius:var(--radius-sm);font-size:12.5px;color:var(--text3)">
+        Noch keine Prüfung gemacht: ${noData.map(p => p.name).join(", ")}
+      </div>` : ""}
     </div>
   `;
 }
@@ -3508,7 +3584,9 @@ function renderComparisonTable() {
 
 // ─── ADMIN VIEW ────────────────────────────────────────────
 async function goAdmin() {
+  document.getElementById("screen-trainer").style.display = "none";
   document.getElementById("screen-admin").style.display = "block";
+  window.scrollTo(0, 0);
   await renderAdminUserList();
   await loadAllParticipantsAdmin();
   const sb = await initSupabase();
@@ -3523,7 +3601,7 @@ async function goAdmin() {
     document.getElementById("countdown-date-display").textContent="Aktuell: "+new Date(cd.value).toLocaleDateString("de-DE");
   }
 }
-function closeAdmin() { document.getElementById("screen-admin").style.display = "none"; }
+function closeAdmin() { document.getElementById("screen-admin").style.display = "none"; window.scrollTo(0,0); }
 
 async function loadAllParticipantsAdmin() {
   const sb = await initSupabase();
@@ -3568,13 +3646,20 @@ async function renderAdminUserList() {
 
 async function changeUserRole(id, role) {
   const sb = await initSupabase();
-  await sb.from("profiles").update({ role }).eq("id", id);
+  const { error } = await sb.from("profiles").update({ role }).eq("id", id);
+  if (error) { alert("Fehler beim Ändern der Rolle: " + error.message); return; }
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)";
+  toast.textContent = "✓ Rolle geändert";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
   await renderAdminUserList();
 }
 async function deleteUser(id, name) {
-  if (!confirm("Nutzer loeschen?")) return;
+  if (!confirm("Nutzer "" + name + "" wirklich löschen?")) return;
   const sb = await initSupabase();
-  await sb.from("profiles").delete().eq("id", id);
+  const { error } = await sb.from("profiles").delete().eq("id", id);
+  if (error) { alert("Fehler beim Löschen: " + error.message); return; }
   await renderAdminUserList(); await loadAllParticipantsAdmin();
 }
 
@@ -3696,6 +3781,148 @@ function toggleSidebar() {
   const btn = document.getElementById("sidebar-toggle");
   if (inner) inner.classList.toggle("open");
   if (btn) btn.textContent = inner?.classList.contains("open") ? "✕ Filter schliessen" : "⚙️ Filter & Fortschritt";
+}
+
+async function exportPDF() {
+  // Load jsPDF dynamically
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const today = new Date().toLocaleDateString("de-DE");
+  let y = 20;
+
+  // Header
+  doc.setFillColor(204, 0, 0);
+  doc.rect(0, 0, pageW, 16, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Jugendfeuerwehr Mengeringhausen – Fragenbogentrainer", pageW / 2, 10, { align: "center" });
+  doc.setFontSize(9);
+  doc.text(`Trainerbericht · Erstellt am ${today}`, pageW / 2, 14, { align: "center" });
+  y = 24;
+
+  // Group Summary
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Gruppenübersicht", 14, y); y += 7;
+
+  const totalQ = ALL.length;
+  const participants = trainerParticipants;
+  let totalDone = 0, totalCorrect = 0, totalAnswers = 0;
+  for (const p of participants) {
+    const s = p.store || {};
+    totalDone += Object.keys(s.done || {}).length;
+    for (const v of Object.values(s.qstats || {})) {
+      totalAnswers += v.total || 0;
+      totalCorrect += v.correct || 0;
+    }
+  }
+  const avgPct = participants.length ? Math.round(totalDone / participants.length / totalQ * 100) : 0;
+  const correctPct = totalAnswers ? Math.round(totalCorrect / totalAnswers * 100) : 0;
+  const inactive = participants.filter(p => { const d = daysSinceLastActivity(p); return d !== null && d > 7; }).length;
+  const never = participants.filter(p => !p.store?.history?.length).length;
+
+  doc.autoTable({
+    startY: y,
+    head: [["Teilnehmer", "Ø Fortschritt", "Ø Trefferquote", "Inaktiv >7 Tage", "Noch nie geübt"]],
+    body: [[participants.length, avgPct + "%", correctPct + "%", inactive, never]],
+    styles: { fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [204, 0, 0], textColor: 255 },
+    margin: { left: 14, right: 14 }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Participant Table
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Fortschritt pro Teilnehmer", 14, y); y += 4;
+
+  const partRows = participants.map(p => {
+    const s = p.store || {};
+    const done = Object.keys(s.done || {}).length;
+    const pct = totalQ ? Math.round(done / totalQ * 100) : 0;
+    const qst = s.qstats || {};
+    let tc = 0, tt = 0;
+    for (const v of Object.values(qst)) { tc += v.correct || 0; tt += v.total || 0; }
+    const hitRate = tt ? Math.round(tc / tt * 100) : 0;
+    const days = daysSinceLastActivity(p);
+    const lastActive = days !== null ? `vor ${days} Tagen` : "Noch nie";
+    const sessions = s.history?.length || 0;
+    const lastExam = s.examHistory?.[0] ? `${s.examHistory[0].pct}% (${s.examHistory[0].date})` : "–";
+    return [p.name, `${pct}% (${done}/${totalQ})`, `${hitRate}%`, sessions, lastActive, lastExam];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [["Name", "Fortschritt", "Trefferquote", "Sitzungen", "Zuletzt aktiv", "Letzte Prüfung"]],
+    body: partRows,
+    styles: { fontSize: 9, cellPadding: 2.5 },
+    headStyles: { fillColor: [204, 0, 0], textColor: 255 },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+    margin: { left: 14, right: 14 }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Weak themes
+  const themaStats = {};
+  for (const p of participants) {
+    for (const q of ALL) {
+      const k = `${q.thema}|${q.nr}|${q.stufe}`;
+      const v = p.store?.qstats?.[k];
+      if (!themaStats[q.thema]) themaStats[q.thema] = { total: 0, correct: 0 };
+      if (v) { themaStats[q.thema].total += v.total; themaStats[q.thema].correct += v.correct; }
+    }
+  }
+  const themaRows = Object.entries(themaStats)
+    .filter(([t, v]) => v.total >= 3)
+    .map(([t, v]) => [t, Math.round(v.correct / v.total * 100) + "%", v.total + " Antworten", v.total - v.correct + " Fehler"])
+    .sort((a, b) => parseInt(a[1]) - parseInt(b[1]));
+
+  if (themaRows.length) {
+    if (y > 230) { doc.addPage(); y = 20; }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Themen-Auswertung (schlechteste zuerst)", 14, y); y += 4;
+    doc.autoTable({
+      startY: y,
+      head: [["Thema", "Trefferquote", "Antworten gesamt", "Fehler"]],
+      body: themaRows,
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: [204, 0, 0], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 }
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  // Footer on all pages
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`Seite ${i} von ${pageCount}`, pageW / 2, 290, { align: "center" });
+    doc.text("Jugendfeuerwehr Mengeringhausen – Fragenbogentrainer", 14, 290);
+  }
+
+  doc.save(`Trainerbericht_${today.replace(/\./g, "-")}.pdf`);
 }
 
 // INIT
