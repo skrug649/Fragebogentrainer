@@ -1379,6 +1379,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:12.5px;padding:7px 12px">📊 Vergleich</button>
       <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:12.5px;padding:7px 12px">🔍 Schwachstellen</button>
       <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:12.5px;padding:7px 12px">💡 Empfehlungen</button>
+      <button class="bse" id="trainer-view-anfragen" onclick="setTrainerView('anfragen')" style="font-size:12.5px;padding:7px 12px">❓ Anfragen <span id="anfragen-badge" style="display:none;background:var(--red);color:white;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:3px">0</span></button>
       <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:12.5px;padding:7px 12px">🎯 Prüfungen</button>
       <button class="bp" onclick="loadAllParticipants()">🔄 Aktualisieren</button>
       <button class="bse" onclick="exportPDF()" style="font-size:12.5px;padding:7px 12px">📄 PDF Export</button>
@@ -1398,6 +1399,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div id="trainer-auswertung" style="display:none"></div>
   <div id="trainer-empfehlungen" style="display:none"></div>
   <div id="trainer-pruefung" style="display:none"></div>
+  <div id="trainer-anfragen" style="display:none"></div>
 </div>
 
 <!-- ADMIN SCREEN -->
@@ -1603,6 +1605,9 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <img id="qimg" src="" alt="Frage Bild" style="display:none;max-width:160px;margin:0 auto .8rem;border-radius:8px;border:1px solid var(--border)">
 <div class="ans" id="ac"></div>
 <div class="fb" id="fbb"><span class="fi2" id="fbi"></span><span id="fbt"></span></div>
+<div id="erklaerung-btn-wrap" style="display:none;margin-top:.5rem">
+  <button onclick="sendeAnfrage()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:12.5px;color:var(--text3);cursor:pointer;font-family:Outfit,sans-serif;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">❓ Erklärung beim Trainer anfragen</button>
+</div>
 </div>
 <div class="qctrl"><button class="bnxt" id="bnxt" onclick="nextQ()">Nächste Frage →</button></div>
 </div>
@@ -2066,6 +2071,7 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="✅";
     document.getElementById("fbt").textContent="Richtig! Gut gemacht!";
     results.push({q,ok:true,given:btn.querySelector("span:last-child").textContent});
+    const ebw=document.getElementById("erklaerung-btn-wrap");if(ebw)ebw.style.display="none";
   } else {
     btn.classList.add("wrg");
     document.querySelectorAll("#ac .ab").forEach(b=>{if(sa.find(a=>a.text===b.querySelector("span:last-child").textContent&&a.korrekt))b.classList.add("cor")});
@@ -2074,6 +2080,9 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="❌";
     document.getElementById("fbt").textContent="Falsch! Richtig: "+ct;
     results.push({q,ok:false,given:btn.querySelector("span:last-child").textContent});
+    // Show Erklärung button
+    const ebw=document.getElementById("erklaerung-btn-wrap");
+    if(ebw){ebw.style.display="block";ebw.dataset.qkey=qKey(q);ebw.dataset.qtext=q.frage;ebw.dataset.thema=q.thema;}
   }
   const bn=document.getElementById("bnxt");
   bn.textContent=idx<quiz.length-1?"Nächste Frage →":"Ergebnis anzeigen →";
@@ -2087,6 +2096,7 @@ function pick(btn,ok,sa,q){
   }
 }
 function nextQ(){
+  const ebw=document.getElementById("erklaerung-btn-wrap");if(ebw)ebw.style.display="none";
   if(idx<quiz.length-1){
     idx++;
     if(store.resume){store.resume.idx=idx;saveStore();}
@@ -3037,6 +3047,14 @@ async function goTrainer() {
   document.getElementById("screen-trainer").style.display = "block";
   window.scrollTo(0, 0);
   renderGroupProgress();
+  // Update anfragen badge
+  try {
+    const sb = await initSupabase();
+    const { data } = await sb.from("fragen_anfragen").select("id").eq("beantwortet", false);
+    const count = data?.length || 0;
+    const badge = document.getElementById("anfragen-badge");
+    if (badge) { badge.textContent = count; badge.style.display = count > 0 ? "inline" : "none"; }
+  } catch(e) {}
   document.getElementById("trainer-list").innerHTML = "<div style='color:var(--text3);padding:1rem 0;font-size:13px'>Lade Teilnehmer...</div>";
   await loadAllParticipants();
 }
@@ -3187,7 +3205,9 @@ function setTrainerView(view) {
   const btnEmpfehlungen = document.getElementById("trainer-view-empfehlungen");
   const empfehlungen = document.getElementById("trainer-empfehlungen");
   const pruefungEl = document.getElementById("trainer-pruefung");
-  [cards, table, auswertung, empfehlungen, pruefungEl].forEach(el => { if(el) el.style.display = "none"; });
+  const anfragenEl = document.getElementById("trainer-anfragen");
+  [cards, table, auswertung, empfehlungen, pruefungEl, anfragenEl].forEach(el => { if(el) el.style.display = "none"; });
+  [btnCards, btnTable, btnAuswertung, btnEmpfehlungen].forEach(btn => { if(btn) { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; } });
   [btnCards, btnTable, btnAuswertung, btnEmpfehlungen].forEach(btn => { btn.className = "bse"; btn.style.fontSize = "12.5px"; btn.style.padding = "7px 12px"; });
   if (view === "cards") {
     cards.style.display = "block"; btnCards.className = "bp"; btnCards.style.fontSize = "12.5px"; btnCards.style.padding = "7px 12px";
@@ -3206,6 +3226,12 @@ function setTrainerView(view) {
     const btnPruefung = document.getElementById("trainer-view-pruefung");
     btnPruefung.className = "bp"; btnPruefung.style.fontSize = "12.5px"; btnPruefung.style.padding = "7px 12px";
     renderPruefungsauswertung();
+  } else if (view === "anfragen") {
+    const anfragen = document.getElementById("trainer-anfragen");
+    anfragen.style.display = "block";
+    const btnAnfragen = document.getElementById("trainer-view-anfragen");
+    btnAnfragen.className = "bp"; btnAnfragen.style.fontSize = "12.5px"; btnAnfragen.style.padding = "7px 12px";
+    renderAnfragen();
   }
 }
 
@@ -3346,6 +3372,83 @@ function renderPruefungsauswertung() {
       </div>` : ""}
     </div>
   `;
+}
+
+async function sendeAnfrage() {
+  const ebw = document.getElementById("erklaerung-btn-wrap");
+  if (!ebw || !currentUser) return;
+  const btn = ebw.querySelector("button");
+  btn.disabled = true;
+  btn.textContent = "⏳ Wird gesendet...";
+  const sb = await initSupabase();
+  const { error } = await sb.from("fragen_anfragen").insert({
+    teilnehmer_id: currentUser.id,
+    teilnehmer_name: currentProfile.name,
+    frage_key: ebw.dataset.qkey,
+    frage_text: ebw.dataset.qtext,
+    thema: ebw.dataset.thema,
+    beantwortet: false
+  });
+  if (error) {
+    btn.textContent = "❌ Fehler beim Senden";
+    btn.disabled = false;
+    return;
+  }
+  btn.textContent = "✅ Anfrage gesendet!";
+  btn.style.color = "var(--green)";
+  btn.style.borderColor = "var(--green)";
+  setTimeout(() => { ebw.style.display = "none"; }, 2000);
+}
+
+async function renderAnfragen() {
+  const el = document.getElementById("trainer-anfragen");
+  if (!el) return;
+  const sb = await initSupabase();
+  const { data, error } = await sb.from("fragen_anfragen").select("*").order("created_at", { ascending: false });
+  if (error || !data || !data.length) {
+    el.innerHTML = "<div style='color:var(--text3);padding:1rem;font-size:13px'>Noch keine Anfragen vorhanden.</div>";
+    return;
+  }
+  const open = data.filter(a => !a.beantwortet);
+  const done = data.filter(a => a.beantwortet);
+
+  const renderRow = (a) => `
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:6px;border-left:3px solid ${a.beantwortet ? "var(--green)" : "var(--red)"}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+            <div class="pc-avatar" style="width:24px;height:24px;font-size:10px">${a.teilnehmer_name.charAt(0).toUpperCase()}</div>
+            <span style="font-weight:700;font-size:13px">${a.teilnehmer_name}</span>
+            <span style="font-size:11px;color:var(--text3)">${ICONS[a.thema]||"📋"} ${a.thema}</span>
+            <span style="font-size:10.5px;color:var(--text3)">${new Date(a.created_at).toLocaleDateString("de-DE")}</span>
+          </div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.4">${a.frage_text}</div>
+        </div>
+        ${!a.beantwortet ? `<button onclick="markiereBeantwortet('${a.id}')" style="background:var(--green-l);border:none;border-radius:var(--radius-sm);padding:6px 12px;font-size:12px;color:var(--green-d);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;flex-shrink:0">✓ Beantwortet</button>` : `<span style="font-size:11px;color:var(--green);font-weight:700">✓ Erledigt</span>`}
+      </div>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:1.25rem">
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
+        <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+          ❓ Offene Anfragen
+          <span style="font-size:12px;font-weight:700;background:${open.length ? "var(--red)" : "var(--green)"};color:white;border-radius:99px;padding:2px 9px">${open.length}</span>
+        </div>
+        ${open.length ? open.map(renderRow).join("") : "<div style='color:var(--text3);font-size:13px'>Keine offenen Anfragen 🎉</div>"}
+      </div>
+      ${done.length ? `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
+        <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem;color:var(--text3)">✓ Erledigte Anfragen (${done.length})</div>
+        ${done.map(renderRow).join("")}
+      </div>` : ""}
+    </div>`;
+}
+
+async function markiereBeantwortet(id) {
+  const sb = await initSupabase();
+  await sb.from("fragen_anfragen").update({ beantwortet: true }).eq("id", id);
+  renderAnfragen();
 }
 
 function renderEmpfehlungen() {
