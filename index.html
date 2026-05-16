@@ -2880,7 +2880,13 @@ async function doLogin() {
     localStorage.setItem('fw_email_map', JSON.stringify(users));
   }
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  if (error) { showLoginError("Name oder Passwort falsch."); return; }
+  if (error) {
+    // Clear cached email so next attempt fetches fresh from DB
+    const updatedUsers = getLocalUsers().filter(u => u.name.toLowerCase() !== name.toLowerCase());
+    localStorage.setItem("fw_email_map", JSON.stringify(updatedUsers));
+    showLoginError("Name oder Passwort falsch. Bitte nochmal versuchen.");
+    return;
+  }
   await loadProfile(data.user);
 }
 
@@ -3624,12 +3630,12 @@ async function goAdmin() {
   document.getElementById("trainer-code-display").textContent = "Aktuell: " + tc;
   document.getElementById("admin-trainer-code").value = tc;
   // Load countdown date
-  const {data:cd}=await sb.from("settings").select("value").eq("key","countdown_date").single().catch(()=>({data:null}));
+  const {data:cd}=await sb.from("settings").select("value").eq("key","countdown_date").maybeSingle();
   if(cd?.value){
     document.getElementById("admin-countdown-date").value=cd.value;
     document.getElementById("countdown-date-display").textContent="Aktuell: "+new Date(cd.value).toLocaleDateString("de-DE");
   }
-  const {data:ct}=await sb.from("settings").select("value").eq("key","countdown_text").single().catch(()=>({data:null}));
+  const {data:ct}=await sb.from("settings").select("value").eq("key","countdown_text").maybeSingle();
   if(ct?.value && document.getElementById("admin-countdown-text")){
     document.getElementById("admin-countdown-text").value=ct.value;
   }
@@ -3800,7 +3806,7 @@ async function loadCountdownDate(){
     const sb=await initSupabase();
     const {data}=await sb.from("settings").select("value").eq("key","countdown_date").single();
     if(data?.value){store.countdownDate=data.value;}
-    const {data:td}=await sb.from("settings").select("value").eq("key","countdown_text").single().catch(()=>({data:null}));
+    const {data:td}=await sb.from("settings").select("value").eq("key","countdown_text").maybeSingle();
     if(td?.value){store.countdownText=td.value;}
     if(store.countdownDate)renderWidgets();
   }catch(e){}
