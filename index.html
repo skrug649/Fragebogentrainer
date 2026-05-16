@@ -2600,7 +2600,7 @@ async function doLogin() {
   const pw = document.getElementById("li-pw").value;
   if (!name || !pw) { showLoginError("Bitte Name und Passwort eingeben."); return; }
   const sb = await initSupabase();
-  const email = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") + "@feuerwehr-fragebogen.de";
+  const email = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") + "@gmail.com";
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
   if (error) { showLoginError("Name oder Passwort falsch."); return; }
   await loadProfile(data.user);
@@ -2628,7 +2628,7 @@ async function doRegister() {
   // First user becomes admin
   const { count } = await sb.from("profiles").select("id", { count: "exact", head: true });
   if (count === 0) role = "admin";
-  const email = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") + "@feuerwehr-fragebogen.de";
+  const email = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") + "@gmail.com";
   const { data, error } = await sb.auth.signUp({
     email, password: pw,
     options: { data: { name, role } }
