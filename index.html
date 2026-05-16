@@ -1445,24 +1445,23 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 
 <!-- TRAINER SCREEN -->
 <div id="screen-trainer" style="display:none;max-width:1400px;margin:0 auto;padding:1.5rem">
-  <div class="page-header" style="flex-wrap:wrap;gap:.75rem">
-    <div style="display:flex;align-items:center;gap:10px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
       <button class="qbk" onclick="closeTrainer()">← Zurück</button>
       <div class="page-title">👥 Trainer-Ansicht</div>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="bp" onclick="loadAllParticipants()" style="font-size:12.5px;padding:7px 12px">🔄 Aktualisieren</button>
-      <button class="bse" onclick="exportPDF()" style="font-size:12.5px;padding:7px 12px">📄 PDF</button>
-      <button class="bse" onclick="openBeamer()" style="font-size:12.5px;padding:7px 12px;background:#1a1a1a;color:white;border-color:#444">📽️ Beamer</button>
+    <div style="display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex:1;min-width:0">
+      <button class="bse" id="trainer-view-cards" onclick="setTrainerView('cards')" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">🃏 Karten</button>
+      <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">📊 Vergleich</button>
+      <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">🔍 Schwachstellen</button>
+      <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">💡 Empfehlungen</button>
+      <button class="bse" id="trainer-view-anfragen" onclick="setTrainerView('anfragen')" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">❓ Anfragen <span id="anfragen-badge" style="display:none;background:var(--red);color:white;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:3px">0</span></button>
+      <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">🎯 Prüfungen</button>
+      <div style="width:1px;height:20px;background:var(--border);flex-shrink:0"></div>
+      <button class="bp" onclick="loadAllParticipants()" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">🔄 Aktualisieren</button>
+      <button class="bse" onclick="exportPDF()" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0">📄 PDF</button>
+      <button class="bse" onclick="openBeamer()" style="font-size:13px;padding:7px 13px;white-space:nowrap;flex-shrink:0;background:#1a1a1a;color:white;border-color:#444">📽️ Beamer</button>
     </div>
-  </div>
-  <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:.75rem;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-    <button class="bse" id="trainer-view-cards" onclick="setTrainerView('cards')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">🃏 Karten</button>
-    <button class="bse" id="trainer-view-table" onclick="setTrainerView('table')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">📊 Vergleich</button>
-    <button class="bse" id="trainer-view-auswertung" onclick="setTrainerView('auswertung')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">🔍 Schwachstellen</button>
-    <button class="bse" id="trainer-view-empfehlungen" onclick="setTrainerView('empfehlungen')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">💡 Empfehlungen</button>
-    <button class="bse" id="trainer-view-anfragen" onclick="setTrainerView('anfragen')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">❓ Anfragen <span id="anfragen-badge" style="display:none;background:var(--red);color:white;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:3px">0</span></button>
-    <button class="bse" id="trainer-view-pruefung" onclick="setTrainerView('pruefung')" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">🎯 Prüfungen</button>
   </div>
   <!-- Gruppenfortschritt -->
   <div id="trainer-group-progress" style="margin-bottom:1.25rem"></div>
