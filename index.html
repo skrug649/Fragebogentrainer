@@ -1482,6 +1482,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div id="admin-trainer-list"></div>
 </div>
 
+<div id="connection-banner" style="display:none;background:#cc0000;color:white;text-align:center;padding:8px;font-size:13px;font-family:Outfit,sans-serif;font-weight:700;position:sticky;top:64px;z-index:99">⚠️ Keine Verbindung zum Server – bitte Seite neu laden</div>
 <div class="app">
 
 <!-- HOME -->
@@ -2784,15 +2785,31 @@ const SUPABASE_URL = "https://rzjyscyivfvdlmjcebhm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6anlzY3lpdmZ2ZGxtamNlYmhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDY5MDAsImV4cCI6MjA5NDI4MjkwMH0.h4PdNKShf_GPDOB_hR_1ryAU6qy5BlE_hP6eW27oTJg";
 
 let supabaseClient = null;
+let connectionOk = true;
+
+function setConnectionStatus(ok) {
+  if (connectionOk === ok) return;
+  connectionOk = ok;
+  const banner = document.getElementById("connection-banner");
+  if (banner) banner.style.display = ok ? "none" : "block";
+}
+
 async function initSupabase() {
   if (supabaseClient) return supabaseClient;
   await new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = "supabase.min.js";
-    s.onload = resolve; s.onerror = reject;
+    s.onload = resolve; s.onerror = () => { setConnectionStatus(false); reject(); };
     document.head.appendChild(s);
   });
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Monitor connection every 30 seconds
+  setInterval(async () => {
+    try {
+      const { error } = await supabaseClient.from("profiles").select("id").limit(1);
+      setConnectionStatus(!error);
+    } catch(e) { setConnectionStatus(false); }
+  }, 30000);
   return supabaseClient;
 }
 
@@ -2875,30 +2892,14 @@ async function doLogin() {
   const pw = document.getElementById("li-pw").value;
   if (!name || !pw) { showLoginError("Bitte Name und Passwort eingeben."); return; }
   const sb = await initSupabase();
-  // First try localStorage (legacy, same device)
-  const users = getLocalUsers();
-  const userRecord = users.find(u => u.name.toLowerCase() === name.toLowerCase());
-  let email = userRecord?.email;
-  // If not found locally, fetch email from Supabase profiles table
-  if (!email) {
-    const { data: profiles, error: profileError } = await sb.from("profiles").select("name, email").ilike("name", name);
-    if (profileError) { showLoginError("Fehler beim Suchen [DB]: " + profileError.message); return; }
-    if (!profiles || profiles.length === 0) { showLoginError("Name nicht gefunden."); return; }
-    const profile = profiles[0];
-    if (!profile.email) { showLoginError("Name gefunden, aber keine E-Mail gespeichert. Bitte Admin kontaktieren."); return; }
-    email = profile.email;
-    // Cache locally for next time
-    users.push({ name, email });
-    localStorage.setItem('fw_email_map', JSON.stringify(users));
-  }
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  if (error) {
-    // Clear cached email so next attempt fetches fresh from DB
-    const updatedUsers = getLocalUsers().filter(u => u.name.toLowerCase() !== name.toLowerCase());
-    localStorage.setItem("fw_email_map", JSON.stringify(updatedUsers));
-    showLoginError("Name oder Passwort falsch. Bitte nochmal versuchen.");
-    return;
-  }
+  // Always fetch email from DB - no localStorage dependency
+  const { data: profiles, error: profileError } = await sb.from("profiles").select("name, email").ilike("name", name);
+  if (profileError) { showLoginError("Verbindungsfehler. Bitte Seite neu laden."); return; }
+  if (!profiles || profiles.length === 0) { showLoginError("Name nicht gefunden."); return; }
+  const profile = profiles[0];
+  if (!profile.email) { showLoginError("Konto nicht vollständig. Bitte Admin kontaktieren."); return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email: profile.email, password: pw });
+  if (error) { showLoginError("Name oder Passwort falsch."); return; }
   await loadProfile(data.user);
 }
 
@@ -3023,7 +3024,9 @@ async function changeOwnPassword() {
 saveStore = function() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch(e) {}
   if (currentUser && supabaseClient) {
-    supabaseClient.from("profiles").update({ store }).eq("id", currentUser.id).then(() => {});
+    supabaseClient.from("profiles").update({ store }).eq("id", currentUser.id).then(({ error }) => {
+      setConnectionStatus(!error);
+    });
   }
 };
 
