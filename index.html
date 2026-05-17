@@ -3366,6 +3366,7 @@ function participantCardHTML(p) {
       <div class="pc-stat"><span class="pc-stat-n">${done}</span><div class="pc-stat-l">Gesehen</div></div>
       <div class="pc-stat"><span class="pc-stat-n" style="color:${pctColor}">${pct}%</span><div class="pc-stat-l">Fortschritt</div></div>
       <div class="pc-stat"><span class="pc-stat-n">${hist.length}</span><div class="pc-stat-l">Sitzungen</div></div>
+      ${hist.length ? `<div class="pc-stat"><span class="pc-stat-n">${Math.round(hist.reduce((a,h)=>a+(h.tot||0),0)/hist.length)}</span><div class="pc-stat-l">Ø Fragen/Runde</div></div>` : ""}
     </div>
     <div class="pc-bar-wrap"><div class="pc-bar" style="width:${pct}%;background:${pctColor}"></div></div>
     ${chartHTML}
