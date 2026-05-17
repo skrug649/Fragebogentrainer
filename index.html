@@ -2173,7 +2173,12 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="✅";
     document.getElementById("fbt").textContent="Richtig! Gut gemacht!";
     results.push({q,ok:true,given:btn.querySelector("span:last-child").textContent});
-    if(!store.hasStarted){store.hasStarted=true;saveStore();}
+    if(!store.hasStarted){
+      store.hasStarted=true;
+      if(currentUser && supabaseClient){
+        supabaseClient.from("profiles").update({store}).eq("id",currentUser.id).then(()=>{});
+      }
+    }
     const ebw=document.getElementById("erklaerung-btn-wrap");if(ebw)ebw.style.display="none";
   } else {
     btn.classList.add("wrg");
@@ -2183,8 +2188,13 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="❌";
     document.getElementById("fbt").textContent="Falsch! Richtig: "+ct;
     results.push({q,ok:false,given:btn.querySelector("span:last-child").textContent});
-    // Mark as started on first answer
-    if(!store.hasStarted){store.hasStarted=true;saveStore();}
+    // Mark as started on first answer - save directly to Supabase
+    if(!store.hasStarted){
+      store.hasStarted=true;
+      if(currentUser && supabaseClient){
+        supabaseClient.from("profiles").update({store}).eq("id",currentUser.id).then(()=>{});
+      }
+    }
     // Save wrong answer immediately to store
     if(!store.recentWrong)store.recentWrong=[];
     store.recentWrong = [{
@@ -3286,12 +3296,16 @@ function participantCardHTML(p) {
 
   // Alle Sitzungen
   const allHistRows = hist.map(h => `
-    <div style="font-size:11.5px;display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="color:var(--text2)">${h.thema}</span>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="color:var(--text3)">${h.cor}✓ ${h.tot-h.cor}✗</span>
+    <div style="font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--text2);font-weight:600">${h.thema}</span>
         <span style="font-weight:700;color:${h.pct>=70?"var(--green)":h.pct>=50?"var(--amber)":"var(--red)"}">${h.pct}%</span>
-        <span style="color:var(--text3);font-size:10.5px">${h.date}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+        <span style="color:var(--green);font-size:11px">✓ ${h.cor} richtig</span>
+        <span style="color:${h.tot-h.cor>0?"var(--red)":"var(--text3)"};font-size:11px">✗ ${h.tot-h.cor} Fehler</span>
+        <span style="color:var(--text3);font-size:10.5px">${h.tot} Fragen</span>
+        <span style="color:var(--text3);font-size:10.5px;margin-left:auto">${h.date}</span>
       </div>
     </div>`).join("");
 
@@ -3495,6 +3509,34 @@ function beamerNext() {
   beamerShowQ();
 }
 
+// Auto-refresh podium every 5 minutes
+setInterval(() => { if(currentUser) renderPodium(); }, 5 * 60 * 1000);
+
+async function getOrSetChampion(scores) {
+  const sb = await initSupabase();
+  const now = new Date();
+  // Check if it's Wednesday after 17:00
+  const isWednesdayAfter17 = now.getDay() === 3 && now.getHours() >= 17;
+  // Get last stored champion
+  const { data: champ } = await sb.from("settings").select("value").eq("key", "weekly_champion").maybeSingle();
+  const stored = champ?.value ? JSON.parse(champ.value) : null;
+
+  // Check if we need to set a new champion (Wednesday after 17:00 and not yet set this week)
+  if (isWednesdayAfter17 && scores.length > 0 && scores[0].score > 0) {
+    const lastSet = stored?.setAt ? new Date(stored.setAt) : null;
+    const lastWednesday = new Date(now);
+    lastWednesday.setDate(now.getDate() - ((now.getDay() + 4) % 7));
+    lastWednesday.setHours(17, 0, 0, 0);
+    // Only set if not already set this week
+    if (!lastSet || lastSet < lastWednesday) {
+      const champion = { name: scores[0].name, setAt: now.toISOString(), weekOf: now.toLocaleDateString("de-DE") };
+      await sb.from("settings").upsert({ key: "weekly_champion", value: JSON.stringify(champion) });
+      return champion;
+    }
+  }
+  return stored;
+}
+
 async function renderPodium() {
   const el = document.getElementById("home-podium");
   if (!el) return;
@@ -3529,11 +3571,24 @@ async function renderPodium() {
   const colors = ["#FFD700", "#C0C0C0", "#CD7F32"];
   const sizes = ["28px", "22px", "20px"];
 
+  const champion = await getOrSetChampion(scores);
   const maxScore = top3[0].score || 1;
+  const championHTML = champion ? `
+    <div style="background:linear-gradient(135deg,#7c4a00,#c47c00);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem;box-shadow:var(--shadow-sm)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:32px">🏆</span>
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:2px">Champion der Woche · ${champion.weekOf}</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:20px;color:white">${champion.name}</div>
+        </div>
+      </div>
+    </div>` : "";
+
   el.innerHTML = `
+    ${championHTML}
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;box-shadow:var(--shadow-sm)">
-      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:.9rem;display:flex;align-items:center;gap:8px">
-        🏆 Wochenpodium
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:.4rem;display:flex;align-items:center;gap:8px">
+        📊 Wochenpodium
         <span style="font-size:11px;font-weight:500;color:var(--text3)">diese Woche</span>
       </div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:.75rem">Wer hat diese Woche die meisten Fragen richtig beantwortet?</div>
@@ -4093,24 +4148,27 @@ async function renderAdminUserList() {
   if (!users || !users.length) { el.innerHTML = `<div style="color:var(--text3);font-size:13px">Keine Nutzer vorhanden.</div>`; return; }
   const roleLabel = { teilnehmer:"Teilnehmer", trainer:"Trainer", admin:"Admin" };
   el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">` + users.map(u => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg3);border-radius:var(--radius-sm);flex-wrap:wrap;gap:8px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="user-avatar role-${u.role}" style="width:32px;height:32px;font-size:13px">${u.name.charAt(0).toUpperCase()}</div>
-        <div>
-          <div style="font-weight:700;font-size:13.5px;font-family:'Outfit',sans-serif">${u.name}</div>
-          <div style="font-size:11.5px;color:var(--text3)">${roleLabel[u.role]||u.role} · seit ${new Date(u.created_at).toLocaleDateString("de-DE")}</div>
+    <div style="padding:9px 12px;background:var(--bg3);border-radius:var(--radius-sm)">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:${u.id !== currentUser?.id ? "6px" : "0"}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="user-avatar role-${u.role}" style="width:32px;height:32px;font-size:13px">${u.name.charAt(0).toUpperCase()}</div>
+          <div>
+            <div style="font-weight:700;font-size:13.5px;font-family:'Outfit',sans-serif">${u.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${roleLabel[u.role]||u.role} · seit ${new Date(u.created_at).toLocaleDateString("de-DE")}</div>
+            <div style="font-size:11px;color:${u.last_login ? "var(--text3)" : "var(--red)"}">Letzter Login: ${u.last_login ? new Date(u.last_login).toLocaleDateString("de-DE") + " " + new Date(u.last_login).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}) : "Noch nie"}</div>
+          </div>
         </div>
-      </div>
-      <div style="display:flex;gap:6px">
         ${u.id !== currentUser?.id ? `
-        <select onchange="changeUserRole('${u.id}',this.value)" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'Inter',sans-serif">
-          <option value="teilnehmer"${u.role==="teilnehmer"?" selected":""}>Teilnehmer</option>
-          <option value="trainer"${u.role==="trainer"?" selected":""}>Trainer</option>
-          <option value="admin"${u.role==="admin"?" selected":""}>Admin</option>
-        </select>
-        <button onclick="resetPassword('${u.id}','${u.name}')" style="background:var(--blue-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--blue);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">🔑 Passwort</button>
-        <button onclick="deleteUser('${u.id}','${u.name}')" style="background:var(--red-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--red-d);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">Loeschen</button>`
-        : `<span style="font-size:12px;color:var(--text3)">Eigenes Konto</span>`}
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <select onchange="changeUserRole('${u.id}',this.value)" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'Inter',sans-serif">
+            <option value="teilnehmer"${u.role==="teilnehmer"?" selected":""}>Teilnehmer</option>
+            <option value="trainer"${u.role==="trainer"?" selected":""}>Trainer</option>
+            <option value="admin"${u.role==="admin"?" selected":""}>Admin</option>
+          </select>
+          <button onclick="resetPassword('${u.id}','${u.name}')" style="background:var(--blue-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--blue);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">🔑 Passwort</button>
+          <button onclick="resetUserProgress('${u.id}','${u.name}')" style="background:var(--amber-l,#fff8e1);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:#b45309;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">↺ Fortschritt</button>
+          <button onclick="deleteUser('${u.id}','${u.name}')" style="background:var(--red-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--red-d);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">Löschen</button>
+        </div>` : `<span style="font-size:12px;color:var(--text3)">Eigenes Konto</span>`}
       </div>
     </div>`).join("") + `</div>`;
 }
@@ -4132,6 +4190,20 @@ async function deleteUser(id, name) {
   const { error } = await sb.from("profiles").delete().eq("id", id);
   if (error) { alert("Fehler beim Löschen: " + error.message); return; }
   await renderAdminUserList(); await loadAllParticipantsAdmin();
+}
+
+async function resetUserProgress(id, name) {
+  if (!confirm("Fortschritt von " + name + " wirklich zurücksetzen? Alle Lernfortschritte, Statistiken und Sitzungen werden gelöscht.")) return;
+  const sb = await initSupabase();
+  const emptyStore = { done:{}, stats:{}, dark:false, resume:null, bookmarks:{}, qstats:{}, history:[], recentWrong:[], hasStarted:false, examHistory:[] };
+  const { error } = await sb.from("profiles").update({ store: emptyStore }).eq("id", id);
+  if (error) { alert("Fehler: " + error.message); return; }
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)";
+  toast.textContent = "✓ Fortschritt von " + name + " zurückgesetzt";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+  await renderAdminUserList();
 }
 
 async function resetPassword(id, name) {
