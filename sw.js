@@ -1,5 +1,12 @@
-const CACHE = "jfmh-v2";
-const ASSETS = ["./", "./index.html", "./supabase.min.js", "./icon-192.png", "./icon-512.png", "./manifest.json"];
+const CACHE = "jfmh-v3";
+const ASSETS = [
+  "/Fragebogentrainer/",
+  "/Fragebogentrainer/index.html",
+  "/Fragebogentrainer/supabase.min.js",
+  "/Fragebogentrainer/icon-192.png",
+  "/Fragebogentrainer/icon-512.png",
+  "/Fragebogentrainer/manifest.json"
+];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
