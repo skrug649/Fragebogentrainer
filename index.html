@@ -1280,6 +1280,10 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div class="user-avatar" id="user-avatar-hdr">?</div>
   <span class="user-name" id="user-name-hdr">–</span>
 </div>
+<div id="notif-bell" style="display:none;position:relative;cursor:pointer;padding:5px 8px;border-radius:8px;transition:background .15s" onclick="openNotifications()" title="Trainer-Kommentare">
+  <span style="font-size:20px">🔔</span>
+  <div id="notif-badge" style="display:none;position:absolute;top:2px;right:2px;width:10px;height:10px;background:var(--red);border-radius:50%;border:2px solid var(--bg)"></div>
+</div>
 <button class="dark-toggle" id="dark-btn" onclick="toggleDark()">🌙</button>
 </div>
 </header>
@@ -1317,6 +1321,17 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div class="more-item" onclick="toggleDark();closeMobileMore()" id="mi-dark">🌙 Darkmode</div>
 </div>
 
+
+<!-- NOTIFICATIONS MODAL -->
+<div id="notif-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:650;align-items:flex-start;justify-content:flex-end;padding:70px 1rem 1rem">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:380px;box-shadow:var(--shadow-lg);max-height:80vh;overflow-y:auto">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px">🔔 Trainer-Kommentare</div>
+      <button onclick="closeNotifications()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+    <div id="notif-list" style="padding:1rem"></div>
+  </div>
+</div>
 
 <!-- ONBOARDING MODAL -->
 <div id="onboarding-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;display:none;align-items:center;justify-content:center;padding:1rem">
@@ -2171,6 +2186,8 @@ function showQ(){
   // Show/hide answer order button state
   const aob=document.getElementById("ans-order-btn");
   if(aob){aob.textContent=answerOrder==="zufall"?"🔀":"📋";aob.style.color=answerOrder==="original"?"var(--red)":"";}
+  // Check for trainer comment on this question
+  showTrainerComment(q);
   const sa=answerOrder==="original"?[...q.antworten.map(a=>({...a}))]:shuffle(q.antworten.map(a=>({...a})));
   const ac=document.getElementById("ac");ac.innerHTML="";
   sa.forEach((a,i)=>{
@@ -3206,6 +3223,7 @@ function onLogin() {
   resetSessionTimer();
   // Show onboarding for new users
   if (!store.onboardingSeen) setTimeout(showOnboarding, 800);
+  checkNotifications();
 }
 
 async function logout() {
@@ -3585,6 +3603,78 @@ function setTrainerView(view) {
     renderAnfragen();
   }
 }
+
+// ─── BENACHRICHTIGUNGEN ──────────────────────────────────────
+async function showTrainerComment(q) {
+  const commentEl = document.getElementById("trainer-comment-box");
+  if (commentEl) commentEl.remove();
+  if (!currentUser) return;
+  const sb = await initSupabase();
+  const key = qKey(q);
+  const { data } = await sb.from("fragen_anfragen")
+    .select("antwort,antwort_datum")
+    .eq("teilnehmer_id", currentUser.id)
+    .eq("frage_key", key)
+    .not("antwort", "is", null)
+    .order("antwort_datum", { ascending: false })
+    .limit(1);
+  if (!data?.length) return;
+  const box = document.createElement("div");
+  box.id = "trainer-comment-box";
+  box.style.cssText = "margin-top:.75rem;padding:10px 14px;background:rgba(25,118,210,.1);border:1px solid rgba(25,118,210,.3);border-radius:var(--radius-sm)";
+  box.innerHTML = `<div style="font-size:11px;font-weight:700;color:#1976d2;margin-bottom:4px">💬 Trainer-Kommentar</div><div style="font-size:13px;color:var(--text2);line-height:1.5">${data[0].antwort}</div>`;
+  const fb = document.getElementById("fbb");
+  if (fb) fb.parentNode.insertBefore(box, fb);
+}
+
+async function checkNotifications() {
+  if (!currentUser) return;
+  const sb = await initSupabase();
+  const { data } = await sb.from("fragen_anfragen")
+    .select("*")
+    .eq("teilnehmer_id", currentUser.id)
+    .not("antwort", "is", null);
+  const bell = document.getElementById("notif-bell");
+  const badge = document.getElementById("notif-badge");
+  if (!bell) return;
+  bell.style.display = "flex";
+  badge.style.display = data?.length ? "block" : "none";
+}
+
+function openNotifications() {
+  const modal = document.getElementById("notif-modal");
+  modal.style.display = "flex";
+  loadNotifications();
+}
+
+function closeNotifications() {
+  document.getElementById("notif-modal").style.display = "none";
+}
+
+async function loadNotifications() {
+  const el = document.getElementById("notif-list");
+  el.innerHTML = "<div style='color:var(--text3);font-size:13px'>Wird geladen...</div>";
+  const sb = await initSupabase();
+  const { data } = await sb.from("fragen_anfragen")
+    .select("*")
+    .eq("teilnehmer_id", currentUser.id)
+    .not("antwort", "is", null)
+    .order("antwort_datum", { ascending: false });
+  if (!data?.length) {
+    el.innerHTML = "<div style='color:var(--text3);font-size:13px;text-align:center;padding:1rem'>Noch keine Kommentare vom Trainer.</div>";
+    return;
+  }
+  el.innerHTML = data.map(a => `
+    <div style="padding:.75rem;background:var(--bg3);border-radius:var(--radius-sm);margin-bottom:.6rem;border-left:3px solid var(--blue,#1976d2)">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">${ICONS[a.thema]||"📋"} ${a.thema} · ${new Date(a.antwort_datum).toLocaleDateString("de-DE")}</div>
+      <div style="font-size:12.5px;color:var(--text2);margin-bottom:6px;font-style:italic">"${a.frage_text.length>80?a.frage_text.slice(0,80)+"…":a.frage_text}"</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.5"><strong>💬 Trainer:</strong> ${a.antwort}</div>
+    </div>`).join("");
+}
+
+document.getElementById("notif-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeNotifications();
+});
 
 // ─── ONBOARDING ─────────────────────────────────────────────
 const OB_STEPS = [
@@ -4036,7 +4126,13 @@ async function renderAnfragen() {
           </div>
           <div style="font-size:13px;color:var(--text2);line-height:1.4">${a.frage_text}</div>
         </div>
-        ${!a.beantwortet ? `<button onclick="markiereBeantwortet('${a.id}')" style="background:var(--green-l);border:none;border-radius:var(--radius-sm);padding:6px 12px;font-size:12px;color:var(--green-d);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;flex-shrink:0">✓ Beantwortet</button>` : `<span style="font-size:11px;color:var(--green);font-weight:700">✓ Erledigt</span>`}
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
+          ${a.antwort ? `<div style="font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 8px;max-width:200px;color:var(--text2)">💬 ${a.antwort.length>50?a.antwort.slice(0,50)+"…":a.antwort}</div>` : ""}
+          <div style="display:flex;gap:6px">
+            <button onclick="trainerKommentar('${a.id}')" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;color:var(--text2);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">💬 ${a.antwort ? "Bearbeiten" : "Kommentieren"}</button>
+            ${!a.beantwortet ? `<button onclick="markiereBeantwortet('${a.id}')" style="background:var(--green-l);border:none;border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;color:var(--green-d);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">✓ Erledigt</button>` : `<span style="font-size:11px;color:var(--green);font-weight:700;padding:5px 0">✓ Erledigt</span>`}
+          </div>
+        </div>
       </div>
     </div>`;
 
@@ -4055,6 +4151,43 @@ async function renderAnfragen() {
         ${done.map(renderRow).join("")}
       </div>` : ""}
     </div>`;
+}
+
+async function trainerKommentar(id) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:420px;box-shadow:var(--shadow-lg);border:1px solid var(--border)">
+      <div style="font-family:Outfit,sans-serif;font-weight:800;font-size:16px;margin-bottom:.5rem">💬 Kommentar / Erklärung</div>
+      <div style="font-size:12.5px;color:var(--text3);margin-bottom:1rem">Der Teilnehmer sieht diesen Kommentar sofort als Benachrichtigung.</div>
+      <textarea id="kommentar-text" placeholder="Erklärung eingeben..." style="width:100%;height:100px;padding:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:Inter,sans-serif;background:var(--bg3);color:var(--text);resize:vertical;outline:none;margin-bottom:.75rem"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;color:var(--text2)">Abbrechen</button>
+        <button onclick="speichereKommentar('${id}',document.getElementById('kommentar-text').value,this)" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:8px 18px;font-size:13px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">Speichern</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+  setTimeout(() => document.getElementById("kommentar-text")?.focus(), 100);
+}
+
+async function speichereKommentar(id, text, btn) {
+  if (!text.trim()) { alert("Bitte einen Kommentar eingeben."); return; }
+  btn.disabled = true; btn.textContent = "Speichert...";
+  const sb = await initSupabase();
+  const { error } = await sb.from("fragen_anfragen").update({
+    antwort: text.trim(),
+    antwort_datum: new Date().toISOString(),
+    beantwortet: true
+  }).eq("id", id);
+  if (error) { alert("Fehler: " + error.message); btn.disabled=false; btn.textContent="Speichern"; return; }
+  btn.closest("[style*=fixed]").remove();
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999";
+  toast.textContent = "✓ Kommentar gespeichert!";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+  renderAnfragen();
 }
 
 async function markiereBeantwortet(id) {
