@@ -1305,6 +1305,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <button class="drop-item" id="drop-trainer-btn" style="display:none" onclick="closeProfileDrop();goTrainer()">👥 Trainer-Ansicht</button>
   <button class="drop-item" id="drop-admin-btn" style="display:none" onclick="closeProfileDrop();goAdmin()">⚙️ Admin-Bereich</button>
   <div class="drop-divider"></div>
+  <button class="drop-item" onclick="store.lernhilfeHidden=false;saveStore();renderLernhilfe();closeProfileDrop()">💡 Lernhilfe anzeigen</button>
   <button class="drop-item" onclick="showInstallGuide();closeProfileDrop()">📲 App installieren</button>
   <button class="drop-item" onclick="showOnboarding()">❓ Hilfe / Tour</button>
   <button class="drop-item" onclick="changeOwnPassword()">🔑 Passwort ändern</button>
@@ -1631,7 +1632,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 </div>
 
 <!-- Lernplan -->
-<div id="home-lernplan" style="margin-bottom:1rem"></div>
+<div id="home-lernhilfe" style="margin-bottom:1rem"></div>
 
 <!-- Countdown + Tagesaufgabe + Bestleistung -->
 <div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
@@ -3275,7 +3276,7 @@ function onLogin() {
   loadCountdownDate();
   renderPodium();
   resetSessionTimer();
-  renderLernplan();
+  renderLernhilfe();
   // Update rank
   { const rs = calcRankScore(store); const re = document.getElementById("hero-rank"); if (re) re.innerHTML = getRankHTML(rs); }
   // Show onboarding for new users
@@ -3409,7 +3410,7 @@ function participantCardHTML(p) {
   const pct = total ? Math.round(done / total * 100) : 0;
   const pctColor = pct >= 80 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)";
   const rankScore = calcRankScore(s);
-  const rankHTML = getRankHTML(rankScore, "small");
+  const rankHTML = getRankHTML(rankScore, "small", p.geschlecht);
   const hist = s.history || [];
   const qst = s.qstats || {};
   const themen = [...new Set(ALL.map(q => q.thema))];
@@ -3672,13 +3673,19 @@ function setTrainerView(view) {
 
 // ─── FEUERWEHR-RÄNGE ─────────────────────────────────────────
 const RAENGE = [
-  { min: 0,  icon: "🌱", name: "Anwärter",          color: "#888" },
-  { min: 20, icon: "🔰", name: "Feuerwehrmann",      color: "#2e7d32" },
-  { min: 40, icon: "⭐", name: "Oberfeuerwehrmann",  color: "#1565c0" },
-  { min: 60, icon: "🌟", name: "Hauptfeuerwehrmann", color: "#e65100" },
-  { min: 80, icon: "🏅", name: "Löschmeister",       color: "#cc0000" },
-  { min: 95, icon: "🏆", name: "Brandmeister",       color: "#7c4a00" }
+  { min: 0,  icon: "🌱", m: "Anwärter",          w: "Anwärterin",         d: "Anwärter/in",         color: "#888" },
+  { min: 20, icon: "🔰", m: "Feuerwehrmann",      w: "Feuerwehrfrau",      d: "Feuerwehrmann/-frau", color: "#2e7d32" },
+  { min: 40, icon: "⭐", m: "Oberfeuerwehrmann",  w: "Oberfeuerwehrfrau",  d: "Oberfeuerwehrmann/-frau", color: "#1565c0" },
+  { min: 60, icon: "🌟", m: "Hauptfeuerwehrmann", w: "Hauptfeuerwehrfrau", d: "Hauptfeuerwehrmann/-frau", color: "#e65100" },
+  { min: 80, icon: "🏅", m: "Löschmeister",       w: "Löschmeisterin",     d: "Löschmeister/in",     color: "#cc0000" },
+  { min: 95, icon: "🏆", m: "Brandmeister",       w: "Brandmeisterin",     d: "Brandmeister/in",     color: "#7c4a00" }
 ];
+
+function getRankName(rank, geschlecht) {
+  if (geschlecht === "weiblich") return rank.w;
+  if (geschlecht === "divers") return rank.d;
+  return rank.m;
+}
 
 function calcRankScore(s) {
   const totalQ = ALL.length;
@@ -3697,11 +3704,17 @@ function getRank(score) {
   return rank;
 }
 
-function getRankHTML(score, size = "normal") {
+function getRankHTML(score, size = "normal", geschlecht = null) {
   const rank = getRank(score);
-  const fs = size === "small" ? "11px" : "13px";
-  const iconFs = size === "small" ? "14px" : "18px";
-  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:${fs};font-weight:700;color:${rank.color}"><span style="font-size:${iconFs}">${rank.icon}</span>${rank.name}</span>`;
+  const g = geschlecht || currentProfile?.geschlecht || "männlich";
+  const name = getRankName(rank, g);
+  if (size === "small") {
+    return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:${rank.color}"><span style="font-size:14px">${rank.icon}</span>${name}</span>`;
+  }
+  return `<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,.25);border-radius:99px;padding:4px 12px 4px 8px;margin-top:2px">
+    <span style="font-size:22px;line-height:1">${rank.icon}</span>
+    <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;color:white;letter-spacing:.3px">${name}</span>
+  </div>`;
 }
 
 // ─── KONFETTI ────────────────────────────────────────────────
@@ -4120,10 +4133,10 @@ async function renderPodium() {
   `;
 }
 
-function renderLernplan() {
-  const el = document.getElementById("home-lernplan");
+function renderLernhilfe() {
+  const el = document.getElementById("home-lernhilfe");
   if (!el) return;
-  if (store.lernplanHidden) { el.innerHTML = ""; return; }
+  if (store.lernhilfeHidden) { el.innerHTML = ""; return; }
   const cdDate = store.countdownDate;
   if (!cdDate) { el.innerHTML = ""; return; }
   const daysLeft = Math.ceil((new Date(cdDate) - new Date()) / 86400000);
@@ -4151,10 +4164,10 @@ function renderLernplan() {
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;box-shadow:var(--shadow-sm)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px">
-          📅 Dein Lernplan
+          📅 Deine Lernhilfe
           <span style="font-size:11px;font-weight:500;color:var(--text3)">freiwillig</span>
         </div>
-        <button onclick="store.lernplanHidden=true;saveStore();renderLernplan()" style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;padding:2px 6px">✕</button>
+        <button onclick="store.lernhilfeHidden=true;saveStore();renderLernhilfe()" style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;padding:2px 6px">✕</button>
       </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:.75rem;flex-wrap:wrap">
         <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:.5rem .9rem;text-align:center">
@@ -4169,10 +4182,11 @@ function renderLernplan() {
       <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px">Empfohlene Themen</div>
       <div style="display:flex;flex-direction:column;gap:4px">
         ${topThemen.map((t,i) => `
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg3);border-radius:var(--radius-sm)">
+          <div onclick="setThema('${t.thema}');startQuiz()" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border-radius:var(--radius-sm);cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--bg3)'">
             <span style="font-size:11px;font-weight:700;color:var(--text3);width:14px">${i+1}.</span>
             <span style="font-size:12.5px;flex:1;font-weight:500">${ICONS[t.thema]||"📋"} ${t.thema}</span>
             <span style="font-size:11px;color:${t.pct<50?"var(--red)":t.pct<70?"var(--amber)":"var(--text3)"};font-weight:700">${t.pct}% · ${t.undone} offen</span>
+            <span style="font-size:11px;color:var(--text3)">▶</span>
           </div>`).join("")}
       </div>` : ""}
     </div>`;
@@ -4780,12 +4794,28 @@ async function renderAdminUserList() {
             <option value="trainer"${u.role==="trainer"?" selected":""}>Trainer</option>
             <option value="admin"${u.role==="admin"?" selected":""}>Admin</option>
           </select>
+          <select onchange="changeUserGeschlecht('${u.id}',this.value)" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'Inter',sans-serif">
+            <option value="männlich"${(u.geschlecht||"männlich")==="männlich"?" selected":""}>♂ männlich</option>
+            <option value="weiblich"${u.geschlecht==="weiblich"?" selected":""}>♀ weiblich</option>
+            <option value="divers"${u.geschlecht==="divers"?" selected":""}>⚧ divers</option>
+          </select>
           <button onclick="resetPassword('${u.id}','${u.name}')" style="background:var(--blue-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--blue);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">🔑 Passwort</button>
           <button onclick="resetUserProgress('${u.id}','${u.name}')" style="background:var(--amber-l,#fff8e1);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:#b45309;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">↺ Fortschritt</button>
           <button onclick="deleteUser('${u.id}','${u.name}')" style="background:var(--red-l);border:none;border-radius:6px;padding:5px 10px;font-size:12px;color:var(--red-d);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700">Löschen</button>
         </div>` : `<span style="font-size:12px;color:var(--text3)">Eigenes Konto</span>`}
       </div>
     </div>`).join("") + `</div>`;
+}
+
+async function changeUserGeschlecht(id, geschlecht) {
+  const sb = await initSupabase();
+  const { error } = await sb.from("profiles").update({ geschlecht }).eq("id", id);
+  if (error) { alert("Fehler: " + error.message); return; }
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999";
+  toast.textContent = "✓ Gespeichert";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 }
 
 async function changeUserRole(id, role) {
