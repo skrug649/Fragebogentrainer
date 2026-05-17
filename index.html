@@ -1294,6 +1294,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <button class="drop-item" id="drop-trainer-btn" style="display:none" onclick="closeProfileDrop();goTrainer()">👥 Trainer-Ansicht</button>
   <button class="drop-item" id="drop-admin-btn" style="display:none" onclick="closeProfileDrop();goAdmin()">⚙️ Admin-Bereich</button>
   <div class="drop-divider"></div>
+  <button class="drop-item" onclick="showOnboarding()">❓ Hilfe / Tour</button>
   <button class="drop-item" onclick="changeOwnPassword()">🔑 Passwort ändern</button>
   <button class="drop-item danger" onclick="logout()">🚪 Abmelden</button>
 </div>
@@ -1316,6 +1317,26 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div class="more-item" onclick="toggleDark();closeMobileMore()" id="mi-dark">🌙 Darkmode</div>
 </div>
 
+
+<!-- ONBOARDING MODAL -->
+<div id="onboarding-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;display:none;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">
+    <!-- Progress bar -->
+    <div style="height:4px;background:var(--bg3)">
+      <div id="ob-progress" style="height:100%;background:var(--red);border-radius:99px;transition:width .3s"></div>
+    </div>
+    <div style="padding:1.75rem 1.5rem">
+      <div id="ob-icon" style="font-size:48px;margin-bottom:1rem;text-align:center"></div>
+      <div id="ob-title" style="font-family:'Outfit',sans-serif;font-weight:900;font-size:20px;margin-bottom:.5rem;text-align:center"></div>
+      <div id="ob-text" style="font-size:14px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:1.5rem"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button id="ob-back" onclick="obStep(-1)" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;color:var(--text2)">← Zurück</button>
+        <div id="ob-dots" style="display:flex;gap:6px"></div>
+        <button id="ob-next" onclick="obStep(1)" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Weiter →</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- BEAMER SCREEN -->
 <div id="screen-beamer" style="display:none;position:fixed;inset:0;z-index:600;background:#0d0d0d;color:white;flex-direction:column;font-family:'Inter',sans-serif">
@@ -2933,8 +2954,76 @@ function setConnectionStatus(ok) {
   if (connectionOk === ok) return;
   connectionOk = ok;
   const banner = document.getElementById("connection-banner");
-  if (banner) banner.style.display = ok ? "none" : "block";
+  if (!banner) return;
+  if (ok) {
+    banner.style.display = "none";
+  } else {
+    banner.style.display = "block";
+    banner.textContent = "⚠️ Keine Verbindung – Daten werden nicht gespeichert. Bitte Internet prüfen.";
+  }
 }
+
+// ─── SESSION TIMEOUT ───────────────────────────────────────
+let sessionTimer = null;
+let sessionWarningTimer = null;
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+const SESSION_WARNING = 25 * 60 * 1000; // warn at 25 minutes
+
+function resetSessionTimer() {
+  clearTimeout(sessionTimer);
+  clearTimeout(sessionWarningTimer);
+  // Remove warning if showing
+  const warn = document.getElementById("session-warning");
+  if (warn) warn.remove();
+  if (!currentUser) return;
+  // Show warning at 25 min
+  sessionWarningTimer = setTimeout(() => {
+    if (!currentUser) return;
+    const div = document.createElement("div");
+    div.id = "session-warning";
+    div.style.cssText = "position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:var(--amber);color:white;padding:12px 20px;border-radius:12px;font-family:Outfit,sans-serif;font-weight:700;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3);display:flex;align-items:center;gap:12px;max-width:320px;text-align:center";
+    div.innerHTML = `⏰ Du wirst in 5 Minuten automatisch abgemeldet.<button onclick="resetSessionTimer();this.parentElement.remove()" style="background:white;color:var(--amber);border:none;border-radius:6px;padding:4px 10px;font-family:Outfit,sans-serif;font-weight:700;font-size:12px;cursor:pointer;margin-left:8px">Aktiv bleiben</button>`;
+    document.body.appendChild(div);
+  }, SESSION_WARNING);
+  // Auto-logout at 30 min
+  sessionTimer = setTimeout(async () => {
+    if (!currentUser) return;
+    const warn = document.getElementById("session-warning");
+    if (warn) warn.remove();
+    await saveStore();
+    const sb = await initSupabase();
+    await sb.auth.signOut();
+    currentUser = null; currentProfile = null;
+    store = { done:{}, stats:{}, dark:false, resume:null, bookmarks:{}, qstats:{}, history:[] };
+    document.getElementById("user-pill").style.display = "none";
+    showLoginScreen();
+    // Show logout message
+    const msg = document.createElement("div");
+    msg.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;font-family:Outfit,sans-serif;text-align:center;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.2)";
+    msg.innerHTML = `<div style="font-size:32px;margin-bottom:.5rem">⏰</div><div style="font-weight:800;font-size:16px;margin-bottom:.4rem">Automatisch abgemeldet</div><div style="font-size:13px;color:var(--text3)">Du wurdest nach 30 Minuten Inaktivität abgemeldet.</div>`;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 4000);
+  }, SESSION_TIMEOUT);
+}
+
+// Reset timer on user activity
+["click","keydown","touchstart","scroll"].forEach(ev =>
+  document.addEventListener(ev, resetSessionTimer, { passive: true })
+);
+
+// React immediately to browser online/offline events
+window.addEventListener("offline", () => setConnectionStatus(false));
+window.addEventListener("online", async () => {
+  // Verify Supabase is actually reachable before showing as online
+  try {
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from("profiles").select("id").limit(1);
+      setConnectionStatus(!error);
+    } else {
+      setConnectionStatus(true);
+    }
+  } catch(e) { setConnectionStatus(false); }
+});
 
 async function initSupabase() {
   if (supabaseClient) return supabaseClient;
@@ -3114,10 +3203,15 @@ function onLogin() {
   updateStreak(); renderWidgets();
   loadCountdownDate();
   renderPodium();
+  resetSessionTimer();
+  // Show onboarding for new users
+  if (!store.onboardingSeen) setTimeout(showOnboarding, 800);
 }
 
 async function logout() {
   closeProfileDrop(); await saveStore();
+  clearTimeout(sessionTimer); clearTimeout(sessionWarningTimer);
+  const warn = document.getElementById("session-warning"); if(warn) warn.remove();
   const sb = await initSupabase();
   await sb.auth.signOut();
   currentUser = null; currentProfile = null;
@@ -3236,6 +3330,13 @@ function participantCardHTML(p) {
   const hist = s.history || [];
   const qst = s.qstats || {};
   const themen = [...new Set(ALL.map(q => q.thema))];
+  // Wiederholungsrate
+  const qstatsEntries = Object.values(s.qstats||{});
+  const totalAnswersAll = qstatsEntries.reduce((a,v) => a+(v.total||0), 0);
+  const uniqueAnswered = qstatsEntries.filter(v => v.total > 0).length;
+  const repeatRate = totalAnswersAll > 0 && uniqueAnswered > 0
+    ? Math.round((totalAnswersAll - uniqueAnswered) / totalAnswersAll * 100)
+    : null;
 
   // Themen-Details
   const themaRows = themen.map(t => {
@@ -3367,6 +3468,7 @@ function participantCardHTML(p) {
       <div class="pc-stat"><span class="pc-stat-n" style="color:${pctColor}">${pct}%</span><div class="pc-stat-l">Fortschritt</div></div>
       <div class="pc-stat"><span class="pc-stat-n">${hist.length}</span><div class="pc-stat-l">Sitzungen</div></div>
       ${hist.length ? `<div class="pc-stat"><span class="pc-stat-n">${Math.round(hist.reduce((a,h)=>a+(h.tot||0),0)/hist.length)}</span><div class="pc-stat-l">Ø Fragen/Runde</div></div>` : ""}
+      ${repeatRate !== null ? `<div class="pc-stat"><span class="pc-stat-n" style="color:${repeatRate>50?"var(--green)":repeatRate>20?"var(--amber)":"var(--text3)"}">${repeatRate}%</span><div class="pc-stat-l">Wiederholungen</div></div>` : ""}
     </div>
     <div class="pc-bar-wrap"><div class="pc-bar" style="width:${pct}%;background:${pctColor}"></div></div>
     ${chartHTML}
@@ -3483,6 +3585,56 @@ function setTrainerView(view) {
     renderAnfragen();
   }
 }
+
+// ─── ONBOARDING ─────────────────────────────────────────────
+const OB_STEPS = [
+  { icon: "🔥", title: "Willkommen beim Fragenbogentrainer!", text: "Diese App hilft dir dich optimal auf die Kreisübung der Jugendfeuerwehr Mengeringhausen vorzubereiten. Lass uns kurz erklären wie alles funktioniert." },
+  { icon: "📖", title: "Fragebogen", text: "Unter 'Fragebogen' findest du alle Fragen nach Thema sortiert. Du kannst einzelne Themen gezielt üben oder alle Fragen auf einmal. Richtige Antworten werden grün markiert, falsche rot." },
+  { icon: "🎯", title: "Prüfungsmodus", text: "Der Prüfungsmodus simuliert die echte Prüfung: 15 Fragen, kein Feedback während der Runde. Erst am Ende siehst du dein Ergebnis. Nutze ihn um dich zu testen!" },
+  { icon: "📊", title: "Statistik & Fortschritt", text: "In der Statistik siehst du deinen Fortschritt pro Thema, deine Trefferquote und wie du dich über Zeit verbesserst. Dein Fortschritt wird automatisch gespeichert." },
+  { icon: "🏆", title: "Wochenpodium", text: "Auf der Startseite siehst du das Wochenpodium – wer hat diese Woche die meisten Fragen richtig beantwortet? Jeden Mittwoch um 17 Uhr wird der Champion der Woche gekürt. Viel Erfolg!" }
+];
+let obCurrentStep = 0;
+
+function showOnboarding() {
+  obCurrentStep = 0;
+  const modal = document.getElementById("onboarding-modal");
+  modal.style.display = "flex";
+  obRender();
+}
+
+function closeOnboarding() {
+  document.getElementById("onboarding-modal").style.display = "none";
+  // Mark as seen
+  if (store) { store.onboardingSeen = true; saveStore(); }
+}
+
+function obStep(dir) {
+  if (dir === 1 && obCurrentStep === OB_STEPS.length - 1) { closeOnboarding(); return; }
+  obCurrentStep = Math.max(0, Math.min(OB_STEPS.length - 1, obCurrentStep + dir));
+  obRender();
+}
+
+function obRender() {
+  const s = OB_STEPS[obCurrentStep];
+  const n = OB_STEPS.length;
+  document.getElementById("ob-icon").textContent = s.icon;
+  document.getElementById("ob-title").textContent = s.title;
+  document.getElementById("ob-text").textContent = s.text;
+  document.getElementById("ob-progress").style.width = ((obCurrentStep + 1) / n * 100) + "%";
+  document.getElementById("ob-back").style.visibility = obCurrentStep === 0 ? "hidden" : "visible";
+  const nextBtn = document.getElementById("ob-next");
+  nextBtn.textContent = obCurrentStep === n - 1 ? "✓ Los geht's!" : "Weiter →";
+  // Dots
+  document.getElementById("ob-dots").innerHTML = OB_STEPS.map((_,i) =>
+    `<div style="width:7px;height:7px;border-radius:50%;background:${i===obCurrentStep?"var(--red)":"var(--border)"}"></div>`
+  ).join("");
+}
+
+// Close on backdrop click
+document.getElementById("onboarding-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeOnboarding();
+});
 
 // ─── BEAMER MODUS ──────────────────────────────────────────
 let beamerQuiz = [], beamerIdx = 0, beamerRevealed = false;
