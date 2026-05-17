@@ -1659,6 +1659,15 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <button class="filter-chip" id="order-zufall" onclick="setOrder('zufall')">🔀 Zufall</button>
 <button class="filter-chip active" id="order-reihenfolge" onclick="setOrder('reihenfolge')">📋 Sortiert</button>
 </div>
+<div class="filter-divider"></div>
+<div class="filter-section">
+<span class="filter-label">Rundengröße</span>
+<button class="filter-chip active" id="size-alle" onclick="setQuizSize('alle')">Alle</button>
+<button class="filter-chip" id="size-5" onclick="setQuizSize(5)">5</button>
+<button class="filter-chip" id="size-10" onclick="setQuizSize(10)">10</button>
+<button class="filter-chip" id="size-15" onclick="setQuizSize(15)">15</button>
+<button class="filter-chip" id="size-20" onclick="setQuizSize(20)">20</button>
+</div>
 </div>
 
 <!-- Themen Grid -->
@@ -1707,7 +1716,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div class="screen" id="screen-stat">
 <div class="page-header">
 <div class="page-title">📊 Statistik</div>
-<button class="stat-reset" onclick="resetStats()">🗑 Zurücksetzen</button>
+<button class="stat-reset" onclick="resetStats()" id="stat-reset-btn">🗑 Zurücksetzen</button>
 </div>
 <div id="stat-summary" class="stat-summary"></div>
 <div id="stat-progress-bar-wrap" style="margin-bottom:1.25rem">
@@ -1772,7 +1781,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div class="qtxt" id="eq-txt"></div>
 <div class="ans" id="eq-ac"></div>
 </div>
-<div class="qctrl"><button class="bnxt" id="eq-nxt" onclick="examNext()" style="display:none">Nächste Frage →</button></div>
+<div class="qctrl" style="display:flex;flex-direction:column;gap:.5rem;align-items:stretch"><button class="bnxt" id="eq-confirm" onclick="confirmExamAnswer()" style="display:none;background:var(--red)">✓ Antwort bestätigen</button><button class="bnxt" id="eq-nxt" onclick="examNext()" style="display:none">Nächste Frage →</button></div>
 </div>
 <div id="exam-result-wrap" style="display:none">
 <div class="rcard" id="exam-rsum"></div>
@@ -1870,7 +1879,7 @@ function toggleDark(){
 if(store.dark){document.body.classList.add("dark");document.getElementById("dark-btn").textContent="☀️";}
 
 // QUIZ STATE
-let filt=[...ALL],quiz=[],idx=0,answered=false,results=[],mode="alle",thema="alle",order="reihenfolge",answerOrder="original";
+let filt=[...ALL],quiz=[],idx=0,answered=false,results=[],mode="alle",thema="alle",order="reihenfolge",answerOrder="original",quizSize="alle";
 
 
 
@@ -1960,6 +1969,13 @@ function setThemaAndRefresh(t){
   applyF();
 }
 function setThemaFromSelect(val){thema=val;applyF();}
+function setQuizSize(s){
+  quizSize=s;
+  document.querySelectorAll("[id^='size-']").forEach(b=>b.classList.remove("active"));
+  const btn=document.getElementById("size-"+(s==="alle"?"alle":s));
+  if(btn)btn.classList.add("active");
+}
+
 function setOrder(o){
   order=o;
   ["zufall","reihenfolge"].forEach(x=>{
@@ -2077,6 +2093,7 @@ function startQuiz(resumeData){
       return true;
     });
     quiz=order==="reihenfolge"?[...filt]:shuffle(filt);
+    if(quizSize!=="alle")quiz=quiz.slice(0,parseInt(quizSize));
     if(!quiz.length)return;
     idx=0;results=[];
     // Save resume state
@@ -2165,6 +2182,14 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="❌";
     document.getElementById("fbt").textContent="Falsch! Richtig: "+ct;
     results.push({q,ok:false,given:btn.querySelector("span:last-child").textContent});
+    // Save wrong answer immediately to store
+    if(!store.recentWrong)store.recentWrong=[];
+    store.recentWrong = [{
+      qk: qKey(q), frage: q.frage, thema: q.thema,
+      korrekt: sa.find(a=>a.korrekt)?.text||"",
+      date: new Date().toLocaleDateString("de-DE")
+    }, ...store.recentWrong.filter(w=>w.qk!==qKey(q))].slice(0,10);
+    saveStore();
     // Show Erklärung button
     const ebw=document.getElementById("erklaerung-btn-wrap");
     if(ebw){ebw.style.display="block";ebw.dataset.qkey=qKey(q);ebw.dataset.qtext=q.frage;ebw.dataset.thema=q.thema;}
@@ -2196,21 +2221,12 @@ function showResults(){
   // Save to session history only if >= 10 questions
   if(!store.history)store.history=[];
   const cor=results.filter(r=>r.ok).length,tot=results.length,pct=Math.round(cor/tot*100);
+  // Save session history only if >= 10 questions
   if(tot >= 10) {
     store.history.unshift({date:new Date().toLocaleDateString("de-DE"),thema:thema==="alle"?"Alle Themen":thema,cor,tot,pct});
     if(store.history.length>10)store.history.pop();
   }
-  // Save last 10 wrong questions
-  if(!store.recentWrong)store.recentWrong=[];
-  const wrongQs = results.filter(r=>!r.ok).map(r=>({
-    qk: qKey(r.q),
-    frage: r.q.frage,
-    thema: r.q.thema,
-    korrekt: r.q.antworten.find(a=>a.korrekt)?.text||"",
-    date: new Date().toLocaleDateString("de-DE")
-  }));
-  store.recentWrong = [...wrongQs, ...store.recentWrong].slice(0, 10);
-  saveStore();
+  // recentWrong is saved in realtime during the quiz
   // Remove lernmodus badge if present
   const badge=document.getElementById("lm-badge");if(badge)badge.remove();
   showScreen("results");
@@ -2679,20 +2695,37 @@ function showExamQ(){
   sa.forEach((a,i)=>{
     const b=document.createElement("button");b.className="ab";
     b.innerHTML=`<span class="ak">${KEYS[i]}</span><span>${a.text}</span>`;
-    b.onclick=()=>pickExam(b,a.korrekt,sa,q);
+    b.onclick=()=>selectExamAnswer(b,a.korrekt,sa,q);
     ac.appendChild(b);
   });
   document.getElementById("eq-nxt").style.display="none";
+  // Hide confirm button initially
+  let confirmBtn = document.getElementById("eq-confirm");
+  if(confirmBtn) confirmBtn.style.display="none";
   updExamDots();
 }
-function pickExam(btn,ok,sa,q){
-  document.querySelectorAll("#eq-ac .ab").forEach(b=>b.disabled=true);
+let examSelectedBtn=null, examSelectedOk=null, examSelectedSa=null, examSelectedQ=null;
+function selectExamAnswer(btn,ok,sa,q){
+  // Deselect previous
+  document.querySelectorAll("#eq-ac .ab").forEach(b=>b.classList.remove("sel"));
   btn.classList.add("sel");
-  examAnswers.push({q,ok,given:btn.querySelector("span:last-child").textContent,sa});
+  examSelectedBtn=btn; examSelectedOk=ok; examSelectedSa=sa; examSelectedQ=q;
+  // Show confirm button
+  let confirmBtn = document.getElementById("eq-confirm");
+  if(confirmBtn){ confirmBtn.style.display="block"; confirmBtn.textContent="✓ Antwort bestätigen"; }
+}
+function confirmExamAnswer(){
+  if(!examSelectedBtn) return;
+  document.querySelectorAll("#eq-ac .ab").forEach(b=>b.disabled=true);
+  examAnswers.push({q:examSelectedQ,ok:examSelectedOk,given:examSelectedBtn.querySelector("span:last-child").textContent,sa:examSelectedSa});
   const nxt=document.getElementById("eq-nxt");
   nxt.textContent=examIdx<examQuiz.length-1?"Nächste Frage →":"Auswertung →";
   nxt.style.display="block";
+  let confirmBtn = document.getElementById("eq-confirm");
+  if(confirmBtn) confirmBtn.style.display="none";
+  examSelectedBtn=null;
 }
+function pickExam(btn,ok,sa,q){ selectExamAnswer(btn,ok,sa,q); }
 function examNext(){if(examIdx<examQuiz.length-1){examIdx++;showExamQ()}else finishExam();}
 function abortExam(){document.getElementById("exam-intro-wrap").style.display="block";document.getElementById("exam-quiz-wrap").style.display="none";document.getElementById("exam-result-wrap").style.display="none";}
 function finishExam(){
@@ -3060,6 +3093,7 @@ function onLogin() {
   document.getElementById("drop-role").textContent = roleLabels[currentProfile.role] || currentProfile.role;
   document.getElementById("drop-trainer-btn").style.display = (currentProfile.role === "trainer" || currentProfile.role === "admin") ? "flex" : "none";
   document.getElementById("drop-admin-btn").style.display = currentProfile.role === "admin" ? "flex" : "none";
+  const srb = document.getElementById("stat-reset-btn"); if(srb) srb.style.display = currentProfile.role === "admin" ? "inline-flex" : "none";
   if (store.dark) document.body.classList.add("dark");
   const btn = document.getElementById("dark-btn"); if (btn) btn.textContent = store.dark ? "☀️" : "🌙";
   loadCustomCatalog();
