@@ -3397,6 +3397,52 @@ function participantCardHTML(p) {
           </div>`).join("")}
       </div>
     </details>` : ""}
+    ${(() => {
+      const themen = [...new Set(ALL.map(q => q.thema))];
+      const stats = s.qstats || {};
+      const pts = themen.map(t => {
+        const qs = Object.entries(stats).filter(([k]) => k.startsWith(t + "|"));
+        if (!qs.length) return 0;
+        const tot = qs.reduce((a,[,v]) => a + (v.total||0), 0);
+        const cor = qs.reduce((a,[,v]) => a + (v.correct||0), 0);
+        return tot ? Math.round(cor/tot*100) : 0;
+      });
+      const n = themen.length;
+      const cx = 80, cy = 80, r = 60;
+      const angleStep = (2 * Math.PI) / n;
+      const polyPoints = pts.map((p,i) => {
+        const a = i * angleStep - Math.PI/2;
+        const pr = r * p / 100;
+        return `${cx + pr * Math.cos(a)},${cy + pr * Math.sin(a)}`;
+      }).join(" ");
+      const gridPoints = (pct) => themen.map((_,i) => {
+        const a = i * angleStep - Math.PI/2;
+        const pr = r * pct / 100;
+        return `${cx + pr * Math.cos(a)},${cy + pr * Math.sin(a)}`;
+      }).join(" ");
+      const axes = themen.map((t,i) => {
+        const a = i * angleStep - Math.PI/2;
+        const x = cx + r * Math.cos(a);
+        const y = cy + r * Math.sin(a);
+        const lx = cx + (r+14) * Math.cos(a);
+        const ly = cy + (r+14) * Math.sin(a);
+        const color = pts[i] >= 70 ? "#2e7d32" : pts[i] >= 50 ? "#e65100" : "#c62828";
+        return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
+          <text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="${color}" font-weight="700">${(ICONS[t]||"")} ${pts[i]}%</text>`;
+      }).join("");
+      return `<details style="margin-top:.75rem">
+        <summary style="font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif;list-style:none">🕸 Themen-Radar</summary>
+        <div style="display:flex;justify-content:center;margin-top:8px">
+          <svg width="190" height="190" viewBox="-15 -5 190 190">
+            <polygon points="${gridPoints(100)}" fill="none" stroke="var(--border)" stroke-width="0.5"/>
+            <polygon points="${gridPoints(70)}" fill="none" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2"/>
+            <polygon points="${gridPoints(50)}" fill="none" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2"/>
+            ${axes}
+            <polygon points="${polyPoints}" fill="rgba(204,0,0,.15)" stroke="#cc0000" stroke-width="1.5"/>
+          </svg>
+        </div>
+      </details>`;
+    })()}
   </div>`;
 }
 
