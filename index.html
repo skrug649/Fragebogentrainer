@@ -1060,7 +1060,7 @@ body.dark .login-hint strong{color:var(--text)}
 .pc-name{font-family:'Outfit',sans-serif;font-weight:700;font-size:14.5px;color:var(--text)}
 .pc-date{font-size:11px;color:var(--text3);margin-top:2px}
 .pc-stats{
-  display:grid;grid-template-columns:repeat(3,1fr);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
   gap:.5rem;margin-bottom:.85rem;
 }
 .pc-stat{
@@ -3474,8 +3474,8 @@ function participantCardHTML(p) {
       const perDay = Math.ceil(remaining / daysLeft);
       const urgency = perDay > 20 ? "var(--red)" : perDay > 10 ? "var(--amber)" : "var(--green)";
       goalHTML = `<div style="margin-top:6px;padding:6px 8px;background:var(--bg3);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div style="font-size:11px;color:var(--text3)">🎯 Ziel bis Kreisübung</div>
-        <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;color:${urgency}">${perDay} Fragen/Tag</div>
+        <div style="font-size:11px;color:var(--text3);flex:1">🎯 Ziel bis Kreisübung</div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;color:${urgency};white-space:nowrap">${perDay} Fragen/Tag</div>
       </div>`;
     }
   }
@@ -3515,7 +3515,7 @@ function participantCardHTML(p) {
   // Find weakest question
   const qstats = s.qstats || {};
   const weakestQ = Object.entries(qstats)
-    .filter(([k,v]) => v.total >= 2)
+    .filter(([k,v]) => v.total >= 2 && Math.round(v.correct/v.total*100) < 100)
     .map(([k,v]) => {
       const parts = k.split("|");
       const q = ALL.find(q => q.thema === parts[0] && String(q.nr) === parts[1]);
@@ -3696,7 +3696,12 @@ function calcRankScore(s) {
   const totalA = qstats.reduce((a,v) => a + (v.total||0), 0);
   const correctA = qstats.reduce((a,v) => a + (v.correct||0), 0);
   const trefferquote = totalA ? correctA / totalA * 100 : 0;
-  return Math.round(fortschritt * 0.5 + trefferquote * 0.5);
+  // Brandmeister requires BOTH 100% progress AND 95%+ accuracy
+  if (fortschritt >= 100 && trefferquote >= 95) return 90;
+  // Löschmeister requires both 90%+ progress AND 80%+ accuracy
+  if (fortschritt >= 90 && trefferquote >= 80) return 80;
+  // For lower ranks use weighted average
+  return Math.min(79, Math.round(fortschritt * 0.5 + trefferquote * 0.5));
 }
 
 function getRank(score) {
@@ -4671,7 +4676,7 @@ function renderAuswertung() {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div style="flex:1">
           <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">${ICONS[q.thema]||"📋"} ${q.thema}</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.4">${q.frage}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.4;word-break:break-word">${q.frage}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:3px">${q.correct} von ${q.total} Antworten richtig</div>
         </div>
         <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:18px;color:${pctColor(q.pct)};flex-shrink:0">${q.pct}%</div>
@@ -4680,7 +4685,7 @@ function renderAuswertung() {
   `).join("") : "<div style='color:var(--text3);font-size:13px'>Noch nicht genug Daten (mind. 3 Antworten pro Frage nötig).</div>";
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem" class="trainer-auswertung-grid">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;overflow:hidden;min-width:0" class="trainer-auswertung-grid">
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
           ⚠️ Schwache Themen
@@ -5085,7 +5090,7 @@ async function exportPDF() {
     // Find weakest question
   const qstats = s.qstats || {};
   const weakestQ = Object.entries(qstats)
-    .filter(([k,v]) => v.total >= 2)
+    .filter(([k,v]) => v.total >= 2 && Math.round(v.correct/v.total*100) < 100)
     .map(([k,v]) => {
       const parts = k.split("|");
       const q = ALL.find(q => q.thema === parts[0] && String(q.nr) === parts[1]);
