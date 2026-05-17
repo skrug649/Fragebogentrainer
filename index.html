@@ -1853,6 +1853,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div id="hist-list"></div>
 </div>
 
+  <div style="text-align:center;padding:1rem 0 .5rem;font-size:11.5px;color:var(--text3)">© 2026 Jugendfeuerwehr Mengeringhausen · Alle Rechte vorbehalten</div>
 </div><!-- /.app -->
 </div>
 
@@ -1904,15 +1905,34 @@ function recordAnswer(q,ok){
 }
 
 // DARK MODE
-function toggleDark(){
-  store.dark=!store.dark;saveStore();
-  document.body.classList.toggle("dark",store.dark);
-  const btn=document.getElementById("dark-btn");
-  if(btn)btn.textContent=store.dark?"☀️":"🌙";
-  const mi=document.getElementById("mi-dark");
-  if(mi)mi.textContent=store.dark?"☀️ Hellmodus":"🌙 Darkmode";
+function applyDark(d) {
+  document.body.classList.toggle("dark", d);
+  const btn = document.getElementById("dark-btn");
+  if (btn) btn.textContent = d ? "☀️" : "🌙";
+  const mi = document.getElementById("mi-dark");
+  if (mi) mi.textContent = d ? "☀️ Hellmodus" : "🌙 Darkmode";
 }
-if(store.dark){document.body.classList.add("dark");document.getElementById("dark-btn").textContent="☀️";}
+
+function toggleDark(){
+  store.dark = !store.dark;
+  store.darkManuallySet = true;
+  saveStore();
+  applyDark(store.dark);
+}
+
+// Apply on load - use system preference if not manually set
+(function() {
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (!store.darkManuallySet) store.dark = systemDark;
+  applyDark(store.dark);
+})();
+
+// React to system changes (only if not manually set)
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+  if (store.darkManuallySet) return;
+  store.dark = e.matches;
+  applyDark(store.dark);
+});
 
 // QUIZ STATE
 let filt=[...ALL],quiz=[],idx=0,answered=false,results=[],mode="alle",thema="alle",order="reihenfolge",answerOrder="original",quizSize="alle";
@@ -2217,6 +2237,7 @@ function pick(btn,ok,sa,q){
         supabaseClient.from("profiles").update({store}).eq("id",currentUser.id).then(()=>{});
       }
     }
+    checkThemaComplete(q);
     const ebw=document.getElementById("erklaerung-btn-wrap");if(ebw)ebw.style.display="none";
   } else {
     btn.classList.add("wrg");
@@ -2591,13 +2612,29 @@ function renderWidgets(){
   const cdEl=document.getElementById("home-widgets-countdown");
   const widgets=[];
   const streak=store.streak?.count||0;
-  const fire=streak>=7?"🔥":streak>=3?"⚡":"✨";
+  // Snapchat-style flames - more flames = longer streak
+  const flames = streak === 0 ? "🌑" 
+    : streak < 3 ? "🔥" 
+    : streak < 7 ? "🔥🔥" 
+    : streak < 14 ? "🔥🔥🔥" 
+    : streak < 30 ? "🔥🔥🔥🔥" 
+    : "🔥🔥🔥🔥🔥";
+  const streakColor = streak === 0 ? "var(--text3)" 
+    : streak < 3 ? "var(--text)" 
+    : streak < 7 ? "#e65100" 
+    : streak < 14 ? "#cc0000" 
+    : "#8b0000";
+  const streakMsg = streak === 0 ? "Noch kein Streak"
+    : streak === 1 ? "1 Tag in Folge – weiter so!"
+    : streak < 7 ? streak + " Tage in Folge 💪"
+    : streak < 14 ? streak + " Tage – du brennst! 🔥"
+    : streak < 30 ? streak + " Tage – unaufhaltbar! 🏆"
+    : streak + " Tage – Legende! 👑";
   widgets.push(`<div class="widget-card">
     <div class="widget-title">Lern-Streak</div>
-    <div class="streak-fire">${fire}</div>
-    <div class="widget-value">${streak}</div>
-    <div class="widget-sub">${streak===1?"Tag in Folge":streak+" Tage in Folge"}</div>
-    ${streak>=7?`<div style="margin-top:6px;font-size:11px;color:var(--amber);font-weight:700">🏆 Woche geschafft!</div>`:""}
+    <div style="font-size:${streak>=14?"36px":streak>=7?"32px":"28px"};line-height:1;margin-bottom:4px;letter-spacing:2px">${flames}</div>
+    <div class="widget-value" style="color:${streakColor}">${streak}</div>
+    <div class="widget-sub" style="color:${streak>=7?"var(--amber)":"var(--text3)"};font-weight:${streak>=7?"700":"400"}">${streakMsg}</div>
   </div>`);
   const task=getDailyTaskStatus();const taskDone=task?.completed;
   widgets.push(`<div class="widget-card">
@@ -3213,8 +3250,8 @@ function onLogin() {
   document.getElementById("drop-trainer-btn").style.display = (currentProfile.role === "trainer" || currentProfile.role === "admin") ? "flex" : "none";
   document.getElementById("drop-admin-btn").style.display = currentProfile.role === "admin" ? "flex" : "none";
   const srb = document.getElementById("stat-reset-btn"); if(srb) srb.style.display = currentProfile.role === "admin" ? "inline-flex" : "none";
-  if (store.dark) document.body.classList.add("dark");
-  const btn = document.getElementById("dark-btn"); if (btn) btn.textContent = store.dark ? "☀️" : "🌙";
+  if (!store.darkManuallySet) store.dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyDark(store.dark);
   loadCustomCatalog();
   applyF(); updBookmarkSidebar(); renderResumeBanner();
   updateStreak(); renderWidgets();
@@ -3601,6 +3638,45 @@ function setTrainerView(view) {
     anfragenEl.style.display = "block";
     btnAnfragen.className = "bp"; btnAnfragen.style.fontSize = "12.5px"; btnAnfragen.style.padding = "7px 12px";
     renderAnfragen();
+  }
+}
+
+// ─── KONFETTI ────────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ["#cc0000","#ff4444","#FFD700","#ff8800","#ffffff","#ff6600"];
+  const count = 80;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("div");
+    const size = Math.random() * 8 + 5;
+    el.style.cssText = `position:fixed;top:-10px;left:${Math.random()*100}vw;width:${size}px;height:${size}px;background:${colors[Math.floor(Math.random()*colors.length)]};border-radius:${Math.random()>0.5?"50%":"2px"};z-index:9999;pointer-events:none;opacity:1`;
+    document.body.appendChild(el);
+    const duration = Math.random() * 2000 + 1500;
+    const xDrift = (Math.random() - 0.5) * 200;
+    const rotation = Math.random() * 720;
+    el.animate([
+      { transform: `translateY(0) translateX(0) rotate(0deg)`, opacity: 1 },
+      { transform: `translateY(100vh) translateX(${xDrift}px) rotate(${rotation}deg)`, opacity: 0 }
+    ], { duration, easing: "ease-in", fill: "forwards" }).onfinish = () => el.remove();
+  }
+}
+
+function checkThemaComplete(q) {
+  const thema = q.thema;
+  const themaQs = ALL.filter(q => q.thema === thema);
+  const allDone = themaQs.every(q => store.done[qKey(q)]);
+  if (allDone && !store.completedThemen?.includes(thema)) {
+    if (!store.completedThemen) store.completedThemen = [];
+    store.completedThemen.push(thema);
+    saveStore();
+    // Show celebration
+    setTimeout(() => {
+      launchConfetti();
+      const toast = document.createElement("div");
+      toast.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem 2rem;text-align:center;z-index:9998;box-shadow:0 8px 32px rgba(0,0,0,.3);animation:dropIn .3s ease";
+      toast.innerHTML = `<div style="font-size:48px;margin-bottom:.5rem">🎉</div><div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:18px;margin-bottom:.3rem">Thema abgeschlossen!</div><div style="font-size:13px;color:var(--text3)">${ICONS[thema]||"📋"} ${thema} zu 100% gemeistert!</div>`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3500);
+    }, 500);
   }
 }
 
@@ -4153,6 +4229,7 @@ async function renderAnfragen() {
           <div style="display:flex;gap:6px">
             <button onclick="trainerKommentar('${a.id}')" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;color:var(--text2);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">💬 ${a.antwort ? "Bearbeiten" : "Kommentieren"}</button>
             ${!a.beantwortet ? `<button onclick="markiereBeantwortet('${a.id}')" style="background:var(--green-l);border:none;border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;color:var(--green-d);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">✓ Erledigt</button>` : `<span style="font-size:11px;color:var(--green);font-weight:700;padding:5px 0">✓ Erledigt</span>`}
+            <button onclick="loescheAnfrage('${a.id}')" style="background:var(--red-l);border:none;border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;color:var(--red-d);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">🗑</button>
           </div>
         </div>
       </div>
@@ -4199,8 +4276,7 @@ async function speichereKommentar(id, text, btn) {
   const sb = await initSupabase();
   const { error } = await sb.from("fragen_anfragen").update({
     antwort: text.trim(),
-    antwort_datum: new Date().toISOString(),
-    beantwortet: true
+    antwort_datum: new Date().toISOString()
   }).eq("id", id);
   if (error) { alert("Fehler: " + error.message); btn.disabled=false; btn.textContent="Speichern"; return; }
   btn.closest("[style*=fixed]").remove();
@@ -4209,6 +4285,13 @@ async function speichereKommentar(id, text, btn) {
   toast.textContent = "✓ Kommentar gespeichert!";
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2500);
+  renderAnfragen();
+}
+
+async function loescheAnfrage(id) {
+  if (!confirm("Anfrage wirklich löschen?")) return;
+  const sb = await initSupabase();
+  await sb.from("fragen_anfragen").delete().eq("id", id);
   renderAnfragen();
 }
 
