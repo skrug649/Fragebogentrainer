@@ -2173,6 +2173,7 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="✅";
     document.getElementById("fbt").textContent="Richtig! Gut gemacht!";
     results.push({q,ok:true,given:btn.querySelector("span:last-child").textContent});
+    if(!store.hasStarted){store.hasStarted=true;saveStore();}
     const ebw=document.getElementById("erklaerung-btn-wrap");if(ebw)ebw.style.display="none";
   } else {
     btn.classList.add("wrg");
@@ -2182,6 +2183,8 @@ function pick(btn,ok,sa,q){
     document.getElementById("fbi").textContent="❌";
     document.getElementById("fbt").textContent="Falsch! Richtig: "+ct;
     results.push({q,ok:false,given:btn.querySelector("span:last-child").textContent});
+    // Mark as started on first answer
+    if(!store.hasStarted){store.hasStarted=true;saveStore();}
     // Save wrong answer immediately to store
     if(!store.recentWrong)store.recentWrong=[];
     store.recentWrong = [{
@@ -3294,7 +3297,7 @@ function participantCardHTML(p) {
 
   const days = daysSinceLastActivity(p);
   const isInactive = days !== null && days > 7;
-  const neverActive = !p.store?.history?.length;
+  const neverActive = !p.store?.hasStarted && !p.store?.history?.length;
   const inactiveWarning = isInactive ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--amber)">⚠️ ${days} Tage nicht geübt</div>`
     : neverActive ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:var(--red)">🔴 Noch nie geübt</div>` : "";
   const cardBorder = isInactive ? "border:2px solid var(--amber);" : neverActive ? "border:2px solid var(--red);" : "";
@@ -3576,7 +3579,7 @@ function renderGroupProgress() {
   const correctPct = totalAnswers ? Math.round(totalCorrect / totalAnswers * 100) : 0;
   const pctColor = p => p >= 80 ? "var(--green)" : p >= 50 ? "var(--amber)" : "var(--red)";
   const inactiveCount = trainerParticipants.filter(p => { const d = daysSinceLastActivity(p); return d !== null && d > 7; }).length;
-  const neverCount = trainerParticipants.filter(p => !p.store?.history?.length).length;
+  const neverCount = trainerParticipants.filter(p => !p.store?.hasStarted && !p.store?.history?.length).length;
 
   // Countdown
   let countdownHTML = "";
@@ -4312,7 +4315,7 @@ async function exportPDF() {
   const avgPct = participants.length ? Math.round(totalDone / participants.length / totalQ * 100) : 0;
   const correctPct = totalAnswers ? Math.round(totalCorrect / totalAnswers * 100) : 0;
   const inactive = participants.filter(p => { const d = daysSinceLastActivity(p); return d !== null && d > 7; }).length;
-  const never = participants.filter(p => !p.store?.history?.length).length;
+  const never = participants.filter(p => !p.store?.hasStarted && !p.store?.history?.length).length;
 
   doc.autoTable({
     startY: y,
