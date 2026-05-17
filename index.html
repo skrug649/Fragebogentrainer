@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#cc0000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JF Fragebogen">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Jugendfeuerwehr Mengeringhausen – Fragenbogentrainer</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1298,6 +1304,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <button class="drop-item" id="drop-trainer-btn" style="display:none" onclick="closeProfileDrop();goTrainer()">👥 Trainer-Ansicht</button>
   <button class="drop-item" id="drop-admin-btn" style="display:none" onclick="closeProfileDrop();goAdmin()">⚙️ Admin-Bereich</button>
   <div class="drop-divider"></div>
+  <button class="drop-item" onclick="showInstallGuide();closeProfileDrop()">📲 App installieren</button>
   <button class="drop-item" onclick="showOnboarding()">❓ Hilfe / Tour</button>
   <button class="drop-item" onclick="changeOwnPassword()">🔑 Passwort ändern</button>
   <button class="drop-item danger" onclick="logout()">🚪 Abmelden</button>
@@ -4956,6 +4963,53 @@ async function exportPDF() {
   }
 
   doc.save(`Trainerbericht_${today.replace(/\./g, "-")}.pdf`);
+}
+
+// Register Service Worker
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+
+// PWA Install prompt
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+
+function showInstallGuide() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:380px;box-shadow:var(--shadow-lg)">
+      <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:18px;margin-bottom:.3rem">📲 App installieren</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:1.25rem">Füge die App zum Homescreen hinzu – startet dann wie eine echte App!</div>
+      ${isAndroid || (!isIOS && deferredPrompt) ? `
+        <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:.9rem;margin-bottom:.75rem">
+          <div style="font-weight:700;font-size:13px;margin-bottom:.4rem">🤖 Android</div>
+          <div style="font-size:12.5px;color:var(--text2);line-height:1.6">1. Tippe oben rechts auf die <strong>drei Punkte ⋮</strong><br>2. Wähle <strong>„Zum Startbildschirm hinzufügen"</strong><br>3. Bestätigen – fertig!</div>
+        </div>` : ""}
+      ${isIOS || !isAndroid ? `
+        <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:.9rem;margin-bottom:.75rem">
+          <div style="font-weight:700;font-size:13px;margin-bottom:.4rem">🍎 iPhone (Safari)</div>
+          <div style="font-size:12.5px;color:var(--text2);line-height:1.6">1. Öffne die Seite in <strong>Safari</strong><br>2. Tippe auf das <strong>Teilen-Symbol</strong> ⬆️<br>3. Wähle <strong>„Zum Home-Bildschirm"</strong><br>4. Bestätigen – fertig!</div>
+        </div>` : ""}
+      ${deferredPrompt ? `<button onclick="installPWA();this.closest('[style*=fixed]').remove()" style="width:100%;background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:12px;font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:.5rem">▼ Jetzt installieren</button>` : ""}
+      <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;color:var(--text2)">Schließen</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+}
+
+async function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
 }
 
 // INIT
