@@ -1220,7 +1220,7 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
   .bottom-nav{display:block}
   .tg{grid-template-columns:1fr;gap:.6rem}
   .home-widgets-grid{grid-template-columns:1fr 1fr!important}
-  .trainer-auswertung-grid{grid-template-columns:1fr!important}
+  .trainer-auswertung-grid{grid-template-columns:1fr!important;display:grid!important}
   .hero{padding:.85rem 1rem;flex-direction:column;align-items:stretch}
   .hero h1{font-size:14px}
   .hero-right{flex-direction:row;justify-content:space-between;width:100%}
@@ -1339,6 +1339,25 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <button onclick="closeNotifications()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>
     </div>
     <div id="notif-list" style="padding:1rem"></div>
+  </div>
+</div>
+
+<!-- TRAINER ONBOARDING MODAL -->
+<div id="trainer-onboarding-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">
+    <div style="height:4px;background:var(--bg3)">
+      <div id="tob-progress" style="height:100%;background:var(--red);border-radius:99px;transition:width .3s"></div>
+    </div>
+    <div style="padding:1.75rem 1.5rem">
+      <div id="tob-icon" style="font-size:48px;margin-bottom:1rem;text-align:center"></div>
+      <div id="tob-title" style="font-family:'Outfit',sans-serif;font-weight:900;font-size:20px;margin-bottom:.5rem;text-align:center"></div>
+      <div id="tob-text" style="font-size:14px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:1.5rem"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button id="tob-back" onclick="trainerObStep2(-1)" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;color:var(--text2)">← Zurück</button>
+        <div id="tob-dots" style="display:flex;gap:6px"></div>
+        <button id="tob-next" onclick="trainerObStep2(1)" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:8px 20px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Weiter →</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1498,6 +1517,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
     </div>
     <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
       <button class="bp" onclick="loadAllParticipants()" style="font-size:12px;padding:6px 10px;white-space:nowrap">🔄</button>
+      <button class="bse" onclick="showTrainerOnboarding()" style="font-size:12px;padding:6px 10px;white-space:nowrap;flex-shrink:0">❓ Hilfe</button>
       <button class="bse" onclick="exportPDF()" style="font-size:12px;padding:6px 10px;white-space:nowrap">📄 PDF</button>
       <button class="bse" onclick="openBeamer()" style="font-size:12px;padding:6px 10px;white-space:nowrap;background:#1a1a1a;color:white;border-color:#444">📽️ Beamer</button>
     </div>
@@ -3372,6 +3392,7 @@ async function goTrainer() {
   document.getElementById("screen-trainer").style.display = "block";
   window.scrollTo(0, 0);
   renderGroupProgress();
+  if (!store.trainerOnboardingSeen) setTimeout(showTrainerOnboarding, 600);
   // Update anfragen badge
   try {
     const sb = await initSupabase();
@@ -3902,6 +3923,49 @@ document.getElementById("notif-modal").addEventListener("click", function(e) {
 });
 
 // ─── ONBOARDING ─────────────────────────────────────────────
+const TRAINER_OB_STEPS = [
+  { icon: "👥", title: "Willkommen in der Trainer-Ansicht!", text: "Hier hast du alle Werkzeuge um den Lernfortschritt deiner Gruppe zu verfolgen und zu steuern. Lass uns die wichtigsten Funktionen kurz erklären." },
+  { icon: "📈", title: "Gruppenfortschritt", text: "Ganz oben siehst du den Überblick: wie weit die Gruppe insgesamt ist, die Trefferquote, wer inaktiv ist und wie viele Tage bis zur Kreisübung noch bleiben." },
+  { icon: "🔍", title: "Schwachstellen & Empfehlungen", text: "Unter 'Schwachstellen' siehst du welche Themen am schlechtesten laufen. Unter 'Empfehlungen' bekommst du konkrete Hinweise was du als Trainer tun kannst." },
+  { icon: "❓", title: "Anfragen & Kommentare", text: "Wenn ein Teilnehmer eine Frage nicht versteht kann er eine Erklärung anfragen. Du siehst alle Anfragen hier und kannst direkt einen Kommentar hinterlassen – der Teilnehmer bekommt eine Benachrichtigung." },
+  { icon: "📽️", title: "Beamer-Modus", text: "Für Gruppenübungen am Smartboard! Starte den Beamer-Modus, wähle Thema und Stufe, und tippe auf eine Antwort um sie aufzudecken. Läuft auf jedem Gerät im Browser." },
+  { icon: "🏅", title: "Rang-System", text: "Jeder Teilnehmer hat einen Rang basierend auf Fortschritt und Trefferquote – von Anwärter bis Brandmeister. Im Admin-Bereich kannst du Geschlecht einstellen damit der richtige Rang angezeigt wird." },
+  { icon: "📄", title: "PDF-Export & Prüfungen", text: "Mit 'PDF' exportierst du einen vollständigen Trainerbericht. Unter 'Prüfungen' siehst du alle Prüfungssimulations-Ergebnisse deiner Teilnehmer mit Trend und Bestleistung." }
+];
+let trainerObStep = 0;
+
+function showTrainerOnboarding() {
+  trainerObStep = 0;
+  const modal = document.getElementById("trainer-onboarding-modal");
+  if (modal) { modal.style.display = "flex"; trainerObRender(); }
+}
+
+function closeTrainerOnboarding() {
+  const modal = document.getElementById("trainer-onboarding-modal");
+  if (modal) modal.style.display = "none";
+  if (store) { store.trainerOnboardingSeen = true; saveStore(); }
+}
+
+function trainerObStep2(dir) {
+  if (dir === 1 && trainerObStep === TRAINER_OB_STEPS.length - 1) { closeTrainerOnboarding(); return; }
+  trainerObStep = Math.max(0, Math.min(TRAINER_OB_STEPS.length - 1, trainerObStep + dir));
+  trainerObRender();
+}
+
+function trainerObRender() {
+  const s = TRAINER_OB_STEPS[trainerObStep];
+  const n = TRAINER_OB_STEPS.length;
+  document.getElementById("tob-icon").textContent = s.icon;
+  document.getElementById("tob-title").textContent = s.title;
+  document.getElementById("tob-text").textContent = s.text;
+  document.getElementById("tob-progress").style.width = ((trainerObStep + 1) / n * 100) + "%";
+  document.getElementById("tob-back").style.visibility = trainerObStep === 0 ? "hidden" : "visible";
+  document.getElementById("tob-next").textContent = trainerObStep === n - 1 ? "✓ Los geht's!" : "Weiter →";
+  document.getElementById("tob-dots").innerHTML = TRAINER_OB_STEPS.map((_,i) =>
+    `<div style="width:7px;height:7px;border-radius:50%;background:${i===trainerObStep?"var(--red)":"var(--border)"}"></div>`
+  ).join("");
+}
+
 const OB_STEPS = [
   { icon: "🔥", title: "Willkommen beim Fragenbogentrainer!", text: "Diese App hilft dir dich optimal auf die Kreisübung der Jugendfeuerwehr Mengeringhausen vorzubereiten. Lass uns kurz erklären wie alles funktioniert." },
   { icon: "📖", title: "Fragebogen", text: "Unter 'Fragebogen' findest du alle Fragen nach Thema sortiert. Du kannst einzelne Themen gezielt üben oder alle Fragen auf einmal. Richtige Antworten werden grün markiert, falsche rot." },
@@ -4676,7 +4740,7 @@ function renderAuswertung() {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div style="flex:1">
           <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px">${ICONS[q.thema]||"📋"} ${q.thema}</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.4;word-break:break-word">${q.frage}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.4;word-break:break-word;overflow-wrap:break-word">${q.frage}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:3px">${q.correct} von ${q.total} Antworten richtig</div>
         </div>
         <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:18px;color:${pctColor(q.pct)};flex-shrink:0">${q.pct}%</div>
@@ -4685,7 +4749,7 @@ function renderAuswertung() {
   `).join("") : "<div style='color:var(--text3);font-size:13px'>Noch nicht genug Daten (mind. 3 Antworten pro Frage nötig).</div>";
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;overflow:hidden;min-width:0" class="trainer-auswertung-grid">
+    <div style="gap:1.25rem;overflow:hidden;min-width:0" class="trainer-auswertung-grid">
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
           ⚠️ Schwache Themen
