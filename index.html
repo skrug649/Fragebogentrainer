@@ -3268,6 +3268,8 @@ function onLogin() {
   // Show onboarding for new users
   if (!store.onboardingSeen) setTimeout(showOnboarding, 800);
   checkNotifications();
+  // Show PWA install banner for existing users (once)
+  if (store.onboardingSeen && !store.pwabannerSeen) setTimeout(showPWABanner, 1200);
 }
 
 async function logout() {
@@ -3787,7 +3789,8 @@ const OB_STEPS = [
   { icon: "📖", title: "Fragebogen", text: "Unter 'Fragebogen' findest du alle Fragen nach Thema sortiert. Du kannst einzelne Themen gezielt üben oder alle Fragen auf einmal. Richtige Antworten werden grün markiert, falsche rot." },
   { icon: "🎯", title: "Prüfungsmodus", text: "Der Prüfungsmodus simuliert die echte Prüfung: 15 Fragen, kein Feedback während der Runde. Erst am Ende siehst du dein Ergebnis. Nutze ihn um dich zu testen!" },
   { icon: "📊", title: "Statistik & Fortschritt", text: "In der Statistik siehst du deinen Fortschritt pro Thema, deine Trefferquote und wie du dich über Zeit verbesserst. Dein Fortschritt wird automatisch gespeichert." },
-  { icon: "🏆", title: "Wochenpodium", text: "Auf der Startseite siehst du das Wochenpodium – wer hat diese Woche die meisten Fragen richtig beantwortet? Jeden Mittwoch um 17 Uhr wird der Champion der Woche gekürt. Viel Erfolg!" }
+  { icon: "🏆", title: "Wochenpodium", text: "Auf der Startseite siehst du das Wochenpodium – wer hat diese Woche die meisten Fragen richtig beantwortet? Jeden Mittwoch um 17 Uhr wird der Champion der Woche gekürt. Viel Erfolg!" },
+  { icon: "📲", title: "App installieren!", text: "Du kannst diese App direkt auf deinem Homescreen installieren – startet dann wie eine echte App ohne Browser!\n\n🤖 Android: Drei Punkte ⋮ → 'Zum Startbildschirm'\n🍎 iPhone: Teilen ⬆️ → 'Zum Home-Bildschirm'\n\nOder über dein Profilmenü → 📲 App installieren." }
 ];
 let obCurrentStep = 0;
 
@@ -3815,7 +3818,7 @@ function obRender() {
   const n = OB_STEPS.length;
   document.getElementById("ob-icon").textContent = s.icon;
   document.getElementById("ob-title").textContent = s.title;
-  document.getElementById("ob-text").textContent = s.text;
+  document.getElementById("ob-text").innerHTML = s.text.replace(/\n/g, "<br>");
   document.getElementById("ob-progress").style.width = ((obCurrentStep + 1) / n * 100) + "%";
   document.getElementById("ob-back").style.visibility = obCurrentStep === 0 ? "hidden" : "visible";
   const nextBtn = document.getElementById("ob-next");
@@ -4978,6 +4981,26 @@ window.addEventListener("beforeinstallprompt", e => {
   e.preventDefault();
   deferredPrompt = e;
 });
+
+function showPWABanner() {
+  if (store.pwabannerSeen) return;
+  store.pwabannerSeen = true;
+  saveStore();
+  const banner = document.createElement("div");
+  banner.style.cssText = "position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);width:calc(100% - 2rem);max-width:400px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:500;display:flex;align-items:center;gap:12px;animation:dropIn .3s ease";
+  banner.innerHTML = `
+    <span style="font-size:32px;flex-shrink:0">📲</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:2px">App installieren!</div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.4">Füge die App zum Homescreen hinzu – startet wie eine echte App!</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+      <button onclick="showInstallGuide();this.closest('[style*=fixed]').remove()" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:6px 12px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap">Wie geht's?</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif">Nicht jetzt</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => { if(banner.parentNode) banner.remove(); }, 8000);
+}
 
 function showInstallGuide() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
