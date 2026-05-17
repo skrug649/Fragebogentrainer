@@ -1002,6 +1002,7 @@ body.dark .login-hint strong{color:var(--text)}
   animation:dropIn .15s ease;
 }
 @keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
 .profile-drop.open{display:block}
 .profile-drop-header{
   padding:.65rem .8rem .55rem;
@@ -4987,19 +4988,19 @@ function showPWABanner() {
   store.pwabannerSeen = true;
   saveStore();
   const banner = document.createElement("div");
-  banner.style.cssText = "position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);width:calc(100% - 2rem);max-width:400px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:500;display:flex;align-items:center;gap:12px;animation:dropIn .3s ease";
+  banner.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:var(--red);color:white;padding:1rem 1.5rem;box-shadow:0 -4px 20px rgba(0,0,0,.3);z-index:500;display:flex;align-items:center;gap:14px;animation:slideUp .3s ease";
   banner.innerHTML = `
-    <span style="font-size:32px;flex-shrink:0">📲</span>
+    <span style="font-size:36px;flex-shrink:0">📲</span>
     <div style="flex:1;min-width:0">
-      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:2px">App installieren!</div>
-      <div style="font-size:12px;color:var(--text3);line-height:1.4">Füge die App zum Homescreen hinzu – startet wie eine echte App!</div>
+      <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:16px;margin-bottom:2px">Neu: App installieren!</div>
+      <div style="font-size:13px;opacity:.85;line-height:1.4">Füge die App zum Homescreen hinzu – startet wie eine echte App ohne Browser!</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-      <button onclick="showInstallGuide();this.closest('[style*=fixed]').remove()" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:6px 12px;font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap">Wie geht's?</button>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;font-family:'Outfit',sans-serif">Nicht jetzt</button>
+      <button onclick="showInstallGuide();this.closest('[style*=fixed]').remove()" style="background:white;color:var(--red);border:none;border-radius:var(--radius-sm);padding:8px 16px;font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap">Wie geht's? →</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:11px;color:rgba(255,255,255,.7);cursor:pointer;font-family:'Outfit',sans-serif;text-align:center">Nicht jetzt</button>
     </div>`;
   document.body.appendChild(banner);
-  setTimeout(() => { if(banner.parentNode) banner.remove(); }, 8000);
+  setTimeout(() => { if(banner.parentNode) banner.remove(); }, 15000);
 }
 
 function showInstallGuide() {
