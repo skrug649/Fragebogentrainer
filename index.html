@@ -2403,6 +2403,7 @@ function showResults(){
     store.history.unshift({date:new Date().toLocaleDateString("de-DE"),thema:thema==="alle"?"Alle Themen":thema,cor,tot,pct});
     if(store.history.length>10)store.history.pop();
   }
+  checkMotivations(results);
   // recentWrong is saved in realtime during the quiz
   // Remove lernmodus badge if present
   const badge=document.getElementById("lm-badge");if(badge)badge.remove();
@@ -2926,6 +2927,8 @@ function finishExam(){
   document.getElementById("exam-quiz-wrap").style.display="none";
   document.getElementById("exam-result-wrap").style.display="block";
   const cor=examAnswers.filter(a=>a.ok).length,tot=examAnswers.length,pct=Math.round(cor/tot*100);
+  // Notify trainer about new exam result
+  saveExamNotification(pct, cor, tot);
   // Save exam result to store
   if(!store.examHistory)store.examHistory=[];
   updatePersonalRecords();
@@ -3380,6 +3383,7 @@ function onLogin() {
   // Show onboarding for new users
   if (!store.onboardingSeen) setTimeout(showOnboarding, 800);
   checkNotifications();
+  checkExamReactions();
   // Show PWA install banner for existing users (once)
   if (store.onboardingSeen && !store.pwabannerSeen) setTimeout(showPWABanner, 1200);
 }
@@ -3514,6 +3518,13 @@ function participantCardHTML(p) {
   const hist = s.history || [];
   const qst = s.qstats || {};
   const themen = [...new Set(ALL.map(q => q.thema))];
+  // Verbesserungsrate (Vergleich letzte 2 Sitzungen)
+  let verbesserung = null;
+  if (hist.length >= 2) {
+    verbesserung = hist[0].pct - hist[1].pct;
+  }
+  const verbHTML = verbesserung !== null ? `<div style="font-size:11px;font-weight:700;color:${verbesserung>0?"var(--green)":verbesserung<0?"var(--red)":"var(--text3)"};margin-top:3px">${verbesserung>0?"▲ +":"▼ "}${Math.abs(verbesserung)}% zur letzten Sitzung</div>` : "";
+
   // Wiederholungsrate
   const qstatsEntries = Object.values(s.qstats||{});
   const totalAnswersAll = qstatsEntries.reduce((a,v) => a+(v.total||0), 0);
@@ -3638,6 +3649,7 @@ function participantCardHTML(p) {
         <div style="margin-bottom:3px">${rankHTML}</div>
         <div class="pc-date">Dabei seit: ${new Date(p.created_at).toLocaleDateString("de-DE")}</div>
         <div class="pc-date" style="color:${p.last_login ? (new Date()-new Date(p.last_login) > 7*86400000 ? 'var(--amber)' : 'var(--text3)') : 'var(--red)'}">Letzter Login: ${p.last_login ? new Date(p.last_login).toLocaleDateString("de-DE") + " " + new Date(p.last_login).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}) : "Noch nie"}</div>
+        ${verbHTML}
         ${goalHTML}
     ${weakestQ ? `<div style="margin-top:5px;padding:6px 8px;background:var(--red-l);border-radius:var(--radius-sm);border-left:2px solid var(--red)">
       <div style="font-size:10px;font-weight:700;color:var(--red-d);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">⚠️ Schwächste Frage</div>
@@ -3655,6 +3667,19 @@ function participantCardHTML(p) {
       ${hist.length ? `<div class="pc-stat"><span class="pc-stat-n">${Math.round(hist.reduce((a,h)=>a+(h.tot||0),0)/hist.length)}</span><div class="pc-stat-l">Ø Fragen/Runde</div></div>` : ""}
       ${(()=>{const qv=Object.values(s.qstats||{});const tot=qv.reduce((a,v)=>a+(v.total||0),0);const cor=qv.reduce((a,v)=>a+(v.correct||0),0);const tq=tot?Math.round(cor/tot*100):0;const tc=tq>=80?"var(--green)":tq>=50?"var(--amber)":"var(--red)";return tot?`<div class="pc-stat"><span class="pc-stat-n" style="color:${tc}">${tq}%</span><div class="pc-stat-l">Trefferquote</div></div>`:""})()}
       ${repeatRate !== null ? `<div class="pc-stat"><span class="pc-stat-n" style="color:${repeatRate>50?"var(--green)":repeatRate>20?"var(--amber)":"var(--text3)"}">${repeatRate}%</span><div class="pc-stat-l">Wiederholungen</div></div>` : ""}
+      ${(()=>{
+        const cdDate = store.countdownDate;
+        if (!cdDate) return "";
+        const daysLeft = Math.ceil((new Date(cdDate) - new Date()) / 86400000);
+        if (daysLeft <= 0) return "";
+        const remaining = ALL.length - Object.keys(s.done||{}).length;
+        if (remaining === 0) return `<div class="pc-stat"><span class="pc-stat-n" style="color:var(--green)">✓</span><div class="pc-stat-l">Fertig!</div></div>`;
+        const avgPerDay = hist.length >= 3 ? Math.round(hist.slice(0,5).reduce((a,h)=>a+(h.tot||0),0) / Math.min(hist.length,5)) : null;
+        if (!avgPerDay) return "";
+        const daysNeeded = Math.ceil(remaining / avgPerDay);
+        const color = daysNeeded > daysLeft ? "var(--red)" : daysNeeded > daysLeft*0.7 ? "var(--amber)" : "var(--green)";
+        return `<div class="pc-stat"><span class="pc-stat-n" style="color:${color}">${daysNeeded}d</span><div class="pc-stat-l">Lernzeit</div></div>`;
+      })()}
     </div>
     <div class="pc-bar-wrap"><div class="pc-bar" style="width:${pct}%;background:${pctColor}"></div></div>
     ${chartHTML}
@@ -3984,6 +4009,110 @@ function launchConfetti() {
       { transform: `translateY(100vh) translateX(${xDrift}px) rotate(${rotation}deg)`, opacity: 0 }
     ], { duration, easing: "ease-in", fill: "forwards" }).onfinish = () => el.remove();
   }
+}
+
+// ─── MOTIVATIONSNACHRICHTEN ──────────────────────────────────
+const MOTIVATIONS = {
+  firstSession: ["Super Start! 🔥 Du hast deine erste Runde abgeschlossen!", "Gut gemacht! Der erste Schritt ist getan 💪", "Weiter so – jede Frage bringt dich näher zur Kreisübung! 🎯"],
+  streak3: ["3 Tage in Folge! Du bist auf dem richtigen Weg 🔥🔥", "Stark! 3 Tage Streak – bleib dabei! 💪"],
+  streak7: ["Eine ganze Woche! Du bist unaufhaltbar! 🔥🔥🔥", "7 Tage Streak – beeindruckend! 🏆"],
+  perfect: ["Perfekte Runde! 100% richtig – Wahnsinn! 🎯✨", "Alle Fragen richtig! Du bist bereit für die Kreisübung! 🏆"],
+  improvement: ["Du wirst besser! Tolle Verbesserung zur letzten Runde! 📈", "Aufwärtstrend! Keep it up! 🚀"],
+  thema100: ["Thema abgeschlossen! Du hast das gemeistert! 🎉", "100% in einem Thema – Klasse! ⭐"],
+};
+
+function showMotivation(type) {
+  const msgs = MOTIVATIONS[type];
+  if (!msgs) return;
+  const msg = msgs[Math.floor(Math.random() * msgs.length)];
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;top:5rem;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.9rem 1.25rem;max-width:320px;width:90%;box-shadow:var(--shadow-lg);z-index:500;text-align:center;animation:dropIn .3s ease";
+  toast.innerHTML = `<div style="font-size:13.5px;font-weight:600;color:var(--text);line-height:1.4">${msg}</div>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity="0"; toast.style.transition="opacity .4s"; setTimeout(()=>toast.remove(),400); }, 4000);
+}
+
+async function saveExamNotification(pct, cor, tot) {
+  if (!currentUser) return;
+  const sb = await initSupabase();
+  await sb.from("exam_notifications").insert({
+    teilnehmer_id: currentUser.id,
+    teilnehmer_name: currentProfile.name,
+    pct, cor, tot,
+    reaction: null,
+    seen: false
+  }).catch(()=>{});
+}
+
+async function loadExamNotifications() {
+  // Trainer sees reactions to send
+  const el = document.getElementById("trainer-exam-reactions");
+  if (!el) return;
+  const sb = await initSupabase();
+  const { data } = await sb.from("exam_notifications")
+    .select("*").eq("reaction", null).order("created_at", { ascending: false }).limit(20);
+  if (!data?.length) { el.innerHTML = "<div style='color:var(--text3);font-size:13px'>Keine neuen Prüfungsergebnisse.</div>"; return; }
+  el.innerHTML = data.map(n => `
+    <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="pc-avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0">${n.teilnehmer_name.charAt(0).toUpperCase()}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">${n.teilnehmer_name}</div>
+        <div style="font-size:12px;color:${n.pct>=70?"var(--green)":n.pct>=50?"var(--amber)":"var(--red)"}">${n.pct}% · ${n.cor}/${n.tot} richtig</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${["👍","🔥","💪","⭐","🎯"].map(r => `<button onclick="sendReaction('${n.id}','${r}','${n.teilnehmer_id}')" style="font-size:20px;background:none;border:1px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer;transition:transform .1s" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">${r}</button>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+async function sendReaction(notifId, reaction, teilnehmerId) {
+  const sb = await initSupabase();
+  await sb.from("exam_notifications").update({ reaction, seen: false }).eq("id", notifId);
+  loadExamNotifications();
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:14px;z-index:9999";
+  toast.textContent = reaction + " Reaktion gesendet!";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+
+async function checkExamReactions() {
+  if (!currentUser) return;
+  const sb = await initSupabase();
+  const { data } = await sb.from("exam_notifications")
+    .select("reaction").eq("teilnehmer_id", currentUser.id).eq("seen", false).not("reaction", "is", null);
+  if (!data?.length) return;
+  // Show reactions
+  data.forEach(async (n, i) => {
+    setTimeout(() => {
+      const toast = document.createElement("div");
+      toast.style.cssText = "position:fixed;top:5rem;left:50%;transform:translateX(-50%);background:var(--bg2);border:2px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.5rem;text-align:center;z-index:500;box-shadow:var(--shadow-lg);animation:dropIn .3s ease";
+      toast.innerHTML = `<div style="font-size:40px;margin-bottom:.3rem">${n.reaction}</div><div style="font-size:13px;font-weight:600">Dein Trainer hat auf deine Prüfung reagiert!</div>`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }, i * 1000);
+  });
+  // Mark as seen
+  await sb.from("exam_notifications").update({ seen: true }).eq("teilnehmer_id", currentUser.id).not("reaction", "is", null);
+}
+
+function checkMotivations(results) {
+  const cor = results.filter(r=>r.ok).length;
+  const tot = results.length;
+  const pct = Math.round(cor/tot*100);
+  const hist = store.history||[];
+  // First session ever
+  if (hist.length === 0) { setTimeout(()=>showMotivation("firstSession"),1000); return; }
+  // Perfect round
+  if (pct === 100) { setTimeout(()=>showMotivation("perfect"),1000); return; }
+  // Improvement
+  if (hist.length >= 1 && pct > hist[0].pct + 10) { setTimeout(()=>showMotivation("improvement"),1000); return; }
+}
+
+function checkStreak() {
+  const streak = store.streak?.count||0;
+  if (streak === 3) showMotivation("streak3");
+  if (streak === 7) showMotivation("streak7");
 }
 
 function checkRankPromotion() {
@@ -4514,25 +4643,31 @@ function openBeamer() {
   document.getElementById("beamer-end").style.display = "none";
 }
 
-function closeBeamer() {
-  // Show ranking if there were any votes
+async function closeBeamer() {
+  // First notify participants BEFORE unsubscribing
+  if (liveSession) {
+    try {
+      const sb = await initSupabase();
+      await sb.channel("live-" + liveSession).send({
+        type: "broadcast", event: "end", payload: {}
+      });
+      // Mark session inactive
+      await sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ active: false }) });
+    } catch(e) {}
+  }
+  // Then unsubscribe
+  if (liveChannel) { liveChannel.unsubscribe(); liveChannel = null; }
+
+  // Show ranking if there were votes, otherwise close directly
   if (Object.keys(liveVoterScores).length > 0) {
     document.getElementById("beamer-live").style.display = "none";
     document.getElementById("beamer-setup").style.display = "none";
     document.getElementById("beamer-quiz").style.display = "none";
     document.getElementById("beamer-end").style.display = "none";
     showLiveRanking();
-    // Trainer closes manually via buttons in ranking screen
   } else {
     document.getElementById("screen-beamer").style.display = "none";
-  }
-  if (liveChannel) { liveChannel.unsubscribe(); liveChannel = null; }
-  initSupabase().then(sb => sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ active: false }) }));
-  // Notify participants session ended
-  if (liveSession) {
-    initSupabase().then(sb => sb.channel("live-" + liveSession).send({
-      type: "broadcast", event: "end", payload: {}
-    }));
+    document.getElementById("beamer-ranking").style.display = "none";
   }
 }
 
@@ -4921,7 +5056,15 @@ function renderPruefungsauswertung() {
 
   const noData = trainerParticipants.filter(p => !p.store?.examHistory?.length);
 
+  // Load reactions section
+  const reactEl = document.getElementById("trainer-exam-reactions");
+  if (reactEl) loadExamNotifications();
+
   el.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm);margin-bottom:1rem">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:.75rem">👍 Auf Prüfungen reagieren</div>
+      <div id="trainer-exam-reactions"><div style="color:var(--text3);font-size:13px">Wird geladen...</div></div>
+    </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
       <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem">🎯 Prüfungssimulation – Ergebnisse</div>
       ${rows ? `<div style="overflow-x:auto">
@@ -5417,7 +5560,32 @@ function renderAuswertung() {
     </div>
   `).join("") : "<div style='color:var(--text3);font-size:13px'>Noch nicht genug Daten (mind. 3 Antworten pro Frage nötig).</div>";
 
+  // Schwierigste Frage
+  const weeklyQStats = {};
+  for (const p of trainerParticipants) {
+    for (const [k,v] of Object.entries(p.store?.qstats||{})) {
+      if (!weeklyQStats[k]) weeklyQStats[k] = {total:0,correct:0};
+      weeklyQStats[k].total += v.total||0;
+      weeklyQStats[k].correct += v.correct||0;
+    }
+  }
+  const hardestQ = Object.entries(weeklyQStats)
+    .filter(([k,v]) => v.total >= 3)
+    .map(([k,v]) => {
+      const parts = k.split("|");
+      const q = ALL.find(q => q.thema===parts[0] && String(q.nr)===parts[1]);
+      return {frage:q?.frage||k, thema:parts[0], pct:Math.round(v.correct/v.total*100), total:v.total};
+    }).sort((a,b) => a.pct - b.pct)[0];
+
   el.innerHTML = `
+    ${hardestQ ? `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm);margin-bottom:1rem">
+      <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:.75rem">🔥 Schwierigste Frage</div>
+      <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px 14px;border-left:3px solid var(--red)">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px">${ICONS[hardestQ.thema]||"📋"} ${hardestQ.thema}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">${hardestQ.frage}</div>
+        <div style="font-size:12px;color:var(--red);font-weight:700">Nur ${hardestQ.pct}% richtig · ${hardestQ.total} Antworten</div>
+      </div>
+    </div>` : ""}
     <div style="gap:1.25rem;overflow:hidden;min-width:0" class="trainer-auswertung-grid">
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;box-shadow:var(--shadow-sm)">
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
