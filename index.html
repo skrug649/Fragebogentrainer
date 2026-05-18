@@ -1003,6 +1003,7 @@ body.dark .login-hint strong{color:var(--text)}
 }
 @keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.8}}
 .profile-drop.open{display:block}
 .profile-drop-header{
   padding:.65rem .8rem .55rem;
@@ -1489,6 +1490,17 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
     </div>
   </div>
 
+  <!-- Ranking Screen -->
+  <div id="beamer-ranking" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center">
+    <div style="font-size:48px;margin-bottom:.5rem">🏆</div>
+    <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:32px;margin-bottom:.3rem">Ergebnis</div>
+    <div id="beamer-ranking-list" style="margin:1.5rem 0;width:100%;max-width:500px"></div>
+    <div style="display:flex;gap:1rem;justify-content:center">
+      <button onclick="openBeamer()" style="background:#cc0000;color:white;border:none;border-radius:10px;padding:14px 28px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer">🔄 Neue Runde</button>
+      <button onclick="closeBeamer()" style="background:#2a2a2a;color:white;border:1px solid #444;border-radius:10px;padding:14px 28px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer">✕ Beenden</button>
+    </div>
+  </div>
+
   <!-- End Screen -->
   <div id="beamer-end" style="flex:1;display:none;align-items:center;justify-content:center;text-align:center">
     <div>
@@ -1706,6 +1718,9 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 </div>
 
 <!-- Lernplan -->
+<!-- Live Session Banner -->
+<div id="live-session-banner" style="display:none;margin-bottom:1rem"></div>
+
 <div id="home-lernhilfe" style="margin-bottom:1rem"></div>
 
 <!-- Countdown + Tagesaufgabe + Bestleistung -->
@@ -3354,6 +3369,10 @@ function onLogin() {
   renderPodium();
   resetSessionTimer();
   renderLernhilfe();
+  // Start live session polling
+  checkLiveSession();
+  if (liveSessionPollInterval) clearInterval(liveSessionPollInterval);
+  liveSessionPollInterval = setInterval(checkLiveSession, 10000);
   updatePersonalRecords();
   const recsEl = document.getElementById("home-records"); if(recsEl) recsEl.innerHTML = renderPersonalRecords();
   // Update rank
@@ -3368,6 +3387,7 @@ function onLogin() {
 async function logout() {
   closeProfileDrop(); await saveStore();
   clearTimeout(sessionTimer); clearTimeout(sessionWarningTimer);
+  if (liveSessionPollInterval) clearInterval(liveSessionPollInterval);
   const warn = document.getElementById("session-warning"); if(warn) warn.remove();
   const sb = await initSupabase();
   await sb.auth.signOut();
@@ -4202,6 +4222,7 @@ let beamerQuiz = [], beamerIdx = 0, beamerRevealed = false;
 let liveSession = null;
 let liveChannel = null;
 let liveVotes = {};
+let liveVoterScores = {}; // name -> {correct, total}
 let liveQuiz = [];
 let liveIdx = 0;
 let liveRevealed = false;
@@ -4222,7 +4243,9 @@ async function startLiveAbstimmung() {
   liveIdx = 0;
   liveSession = genSessionCode();
   liveVotes = {};
+  liveVoterScores = {};
   liveRevealed = false;
+  document.getElementById("beamer-ranking").style.display = "none";
 
   // Hide setup, show live screen
   document.getElementById("beamer-setup").style.display = "none";
@@ -4239,6 +4262,12 @@ async function startLiveAbstimmung() {
     .on("broadcast", { event: "vote" }, ({ payload }) => {
       if (!liveRevealed) {
         liveVotes[payload.answer] = (liveVotes[payload.answer] || 0) + 1;
+        // Track per-voter
+        if (payload.user) {
+          if (!liveVoterScores[payload.user]) liveVoterScores[payload.user] = { correct: 0, total: 0, answer: payload.answer };
+          liveVoterScores[payload.user].answer = payload.answer;
+          liveVoterScores[payload.user].total++;
+        }
         updateLiveBars();
       }
     })
@@ -4250,12 +4279,15 @@ async function startLiveAbstimmung() {
 function liveShowQ() {
   if (liveIdx >= liveQuiz.length) {
     document.getElementById("beamer-live").style.display = "none";
-    document.getElementById("beamer-end").style.display = "flex";
+    document.getElementById("beamer-end").style.display = "none";
+    showLiveRanking();
     if (liveChannel) liveChannel.unsubscribe();
     return;
   }
   liveVotes = {};
   liveRevealed = false;
+  // Reset only current answer tracking
+  Object.keys(liveVoterScores).forEach(name => { delete liveVoterScores[name].answer; });
   const q = liveQuiz[liveIdx];
   const keys = ["A","B","C","D"];
   document.getElementById("beamer-live-counter").textContent = (liveIdx+1) + " / " + liveQuiz.length;
@@ -4295,6 +4327,14 @@ function updateLiveBars() {
 function beamerLiveReveal() {
   liveRevealed = true;
   const q = liveQuiz[liveIdx];
+  // Find correct answer index
+  const correctIdx = q.antworten.findIndex(a => a.korrekt);
+  // Update scores
+  Object.keys(liveVoterScores).forEach(name => {
+    if (liveVoterScores[name].answer === correctIdx) {
+      liveVoterScores[name].correct = (liveVoterScores[name].correct || 0) + 1;
+    }
+  });
   q.antworten.forEach((a,i) => {
     const el = document.getElementById("live-ans-" + i);
     if (a.korrekt) { el.style.background="#0d3d1a"; el.style.borderColor="#2e7d32"; }
@@ -4304,13 +4344,57 @@ function beamerLiveReveal() {
   });
   document.getElementById("beamer-live-reveal-btn").style.display = "none";
   document.getElementById("beamer-live-next-btn").style.display = "block";
-  // Update DB
   initSupabase().then(sb => sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ code: liveSession, active: true, qidx: liveIdx, revealed: true }) }));
 }
 
 function beamerLiveNext() {
   liveIdx++;
   liveShowQ();
+  // Notify participants
+  if (liveIdx < liveQuiz.length) {
+    const q = liveQuiz[liveIdx];
+    initSupabase().then(sb => {
+      sb.channel("live-" + liveSession).send({
+        type: "broadcast",
+        event: "next",
+        payload: { qidx: liveIdx, quiz: [q] }
+      });
+    });
+  }
+}
+
+// ─── LIVE SESSION POLLING ────────────────────────────────────
+let liveSessionPollInterval = null;
+
+async function checkLiveSession() {
+  if (!currentUser) return;
+  try {
+    const sb = await initSupabase();
+    const { data } = await sb.from("settings").select("value").eq("key", "live_session").maybeSingle();
+    const banner = document.getElementById("live-session-banner");
+    if (!banner) return;
+    if (data?.value) {
+      const session = JSON.parse(data.value);
+      if (session.active && session.code) {
+        banner.style.display = "block";
+        banner.innerHTML = `
+          <div onclick="openVoteScreen()" style="background:var(--red);color:white;border-radius:var(--radius-lg);padding:1rem 1.25rem;display:flex;align-items:center;gap:12px;cursor:pointer;animation:pulse 2s infinite;box-shadow:0 4px 20px rgba(204,0,0,.4)">
+            <span style="font-size:28px;flex-shrink:0">📱</span>
+            <div style="flex:1">
+              <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:15px;margin-bottom:2px">Live-Abstimmung läuft!</div>
+              <div style="font-size:12px;opacity:.85">Tippe hier um mitzumachen → Code: <strong style="letter-spacing:2px">${session.code}</strong></div>
+            </div>
+            <span style="font-size:20px">→</span>
+          </div>`;
+        // Auto-fill code
+        const input = document.getElementById("vote-code-input");
+        if (input) input.value = session.code;
+        return;
+      }
+    }
+    banner.style.display = "none";
+    banner.innerHTML = "";
+  } catch(e) {}
 }
 
 let voteChannel = null;
@@ -4345,12 +4429,14 @@ async function joinLiveSession() {
   document.getElementById("vote-question").style.display = "block";
   showVoteQuestion(session);
 
-  // Subscribe to session updates
-  voteChannel = sb.channel("session-updates-" + code)
+  // Subscribe to next question broadcasts on the SAME channel as votes
+  voteChannel = sb.channel("live-" + code)
     .on("broadcast", { event: "next" }, ({ payload }) => {
       document.getElementById("vote-voted").style.display = "none";
       document.getElementById("vote-answers").style.display = "flex";
-      showVoteQuestion(payload);
+      if (payload.quiz && payload.quiz[0]) {
+        showVoteQuestion({ quiz: payload.quiz, qidx: 0 });
+      }
     })
     .subscribe();
 }
@@ -4379,6 +4465,28 @@ async function sendVote(answerIdx) {
   });
   document.getElementById("vote-answers").style.display = "none";
   document.getElementById("vote-voted").style.display = "block";
+}
+
+function showLiveRanking() {
+  document.getElementById("beamer-ranking").style.display = "flex";
+  const scores = Object.entries(liveVoterScores)
+    .map(([name, s]) => ({ name, correct: s.correct || 0, total: liveQuiz.length }))
+    .sort((a, b) => b.correct - a.correct);
+  const medals = ["🥇","🥈","🥉"];
+  const colors = ["#FFD700","#C0C0C0","#CD7F32"];
+  const list = document.getElementById("beamer-ranking-list");
+  if (!scores.length) {
+    list.innerHTML = "<div style='color:rgba(255,255,255,.5);font-size:15px'>Keine Abstimmungen eingegangen.</div>";
+    return;
+  }
+  list.innerHTML = scores.map((s, i) => `
+    <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;background:rgba(255,255,255,.05);border-radius:10px;margin-bottom:8px;border-left:4px solid ${colors[i]||"#555"}">
+      <span style="font-size:${i<3?"28px":"18px"};flex-shrink:0">${medals[i]||"  "+(i+1)+"."}</span>
+      <span style="font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;flex:1;text-align:left">${s.name}</span>
+      <span style="font-family:'Outfit',sans-serif;font-weight:900;font-size:22px;color:${colors[i]||"white"}">${s.correct}/${s.total}</span>
+    </div>`).join("");
+  // Confetti for winner
+  if (scores.length > 0) launchConfetti();
 }
 
 function openBeamer() {
