@@ -6,6 +6,11 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#cc0000">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="Lern-App der Jugendfeuerwehr Mengeringhausen für die Kreisübung Waldeck-Frankenberg">
+<meta property="og:title" content="JF Mengeringhausen – Fragenbogentrainer">
+<meta property="og:description" content="Übe die Fragen für die Kreisübung der Jugendfeuerwehr Mengeringhausen">
+<meta property="og:image" content="icon-512.png">
+<meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="JF Fragebogen">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -1205,6 +1210,10 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
 @media(max-width:860px){
   .app{padding:.75rem .75rem 80px}
   .hi{padding:0 .85rem;height:52px}
+  .logo-sub{display:none}
+  .logo-title{font-size:11px!important}
+  .user-name{display:none!important}
+  .user-pill{padding:4px 6px!important;min-width:32px;justify-content:center}
   .logo-title{font-size:11px}
   .logo-sub{display:none}
   .hero{padding:1.1rem 1.25rem;flex-direction:column;gap:.85rem;align-items:flex-start}
@@ -1693,6 +1702,20 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   </div>
   <div id="admin-trainer-list"></div>
 </div>
+
+<div id="loading-screen" style="position:fixed;inset:0;background:#cc0000;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .4s">
+  <div style="font-size:64px;margin-bottom:1rem;animation:pulse 1.5s infinite">🔥</div>
+  <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:22px;color:white;letter-spacing:.5px;margin-bottom:.4rem">FEUERWEHR MENGERINGHAUSEN</div>
+  <div style="font-size:13px;color:rgba(255,255,255,.7);margin-bottom:2rem">Fragenbogentrainer</div>
+  <div style="display:flex;gap:6px">
+    <div style="width:8px;height:8px;border-radius:50%;background:white;animation:bounce 1.2s infinite 0s"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:white;animation:bounce 1.2s infinite .2s"></div>
+    <div style="width:8px;height:8px;border-radius:50%;background:white;animation:bounce 1.2s infinite .4s"></div>
+  </div>
+</div>
+<style>
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
+</style>
 
 <div id="connection-banner" style="display:none;background:#cc0000;color:white;text-align:center;padding:8px;font-size:13px;font-family:Outfit,sans-serif;font-weight:700;position:sticky;top:64px;z-index:99">⚠️ Keine Verbindung zum Server – bitte Seite neu laden</div>
 <div class="app">
@@ -3190,13 +3213,20 @@ window.addEventListener("online", async () => {
 
 async function initSupabase() {
   if (supabaseClient) return supabaseClient;
+  try {
   await new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = "supabase.min.js";
-    s.onload = resolve; s.onerror = () => { setConnectionStatus(false); reject(); };
+    s.onload = resolve; s.onerror = () => { setConnectionStatus(false); reject(new Error("Supabase konnte nicht geladen werden")); };
     document.head.appendChild(s);
   });
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch(e) {
+    console.error("Supabase Fehler:", e);
+    setConnectionStatus(false);
+    hideLoadingScreen();
+    throw e;
+  }
   // Monitor connection every 30 seconds
   setInterval(async () => {
     try {
@@ -3213,7 +3243,7 @@ let currentProfile = null;
 
 
 function getLocalUsers(){
-  try{return JSON.parse(localStorage.getItem('fw_email_map')||'[]')}catch(e){return[]}
+  return []; // localStorage no longer used
 }
 // ─── INIT ──────────────────────────────────────────────────
 async function initUserSystem() {
@@ -3238,6 +3268,14 @@ function showLoginSpinner(on) {
   if (btn) { btn.disabled = on; btn.textContent = on ? "Laden..." : "Anmelden →"; }
 }
 
+function hideLoadingScreen() {
+  const ls = document.getElementById("loading-screen");
+  if (ls) {
+    ls.style.opacity = "0";
+    setTimeout(() => ls.remove(), 400);
+  }
+}
+
 async function loadProfile(user) {
   currentUser = user;
   const sb = supabaseClient;
@@ -3254,11 +3292,13 @@ async function loadProfile(user) {
   await sb.from("profiles").update({ last_login: new Date().toISOString() }).eq("id", user.id);
   currentProfile = profile;
   store = { ...{ done:{}, stats:{}, dark:false, resume:null, bookmarks:{}, qstats:{}, history:[] }, ...(profile.store || {}) };
+  hideLoadingScreen();
   onLogin();
 }
 
 // ─── LOGIN SCREEN ──────────────────────────────────────────
 function showLoginScreen() {
+  hideLoadingScreen();
   document.getElementById("login-screen").style.display = "block";
   document.getElementById("login-error").style.display = "none";
 }
@@ -6205,6 +6245,9 @@ async function installPWA() {
   await deferredPrompt.userChoice;
   deferredPrompt = null;
 }
+
+// Fallback - hide loading screen after 6 seconds
+setTimeout(hideLoadingScreen, 6000);
 
 // INIT
 initUserSystem();
