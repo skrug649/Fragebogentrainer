@@ -1617,6 +1617,13 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
     </div>
   </div>
 
+  <!-- Fragen-Meldungen -->
+  <div class="admin-section">
+    <div class="admin-section-title">⚠️ Gemeldete Fragen</div>
+    <div class="admin-section-sub">Von Teilnehmern gemeldete Fehler oder Unklarheiten in Fragen.</div>
+    <div id="admin-meldungen-list"><button class="bse" onclick="loadMeldungen()" style="font-size:12.5px;padding:7px 12px">🔄 Laden</button></div>
+  </div>
+
   <!-- User management -->
   <div class="admin-section">
     <div class="admin-section-title">👤 Nutzer verwalten</div>
@@ -1659,6 +1666,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <!-- Countdown + Tagesaufgabe + Bestleistung -->
 <div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
 <div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem" class="home-widgets-grid"></div>
+<div id="home-records"></div>
 
 <!-- Wochenpodium -->
 <div id="home-podium" style="margin-bottom:1.25rem"></div>
@@ -1770,8 +1778,9 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <img id="qimg" src="" alt="Frage Bild" style="display:none;max-width:160px;margin:0 auto .8rem;border-radius:8px;border:1px solid var(--border)">
 <div class="ans" id="ac"></div>
 <div class="fb" id="fbb"><span class="fi2" id="fbi"></span><span id="fbt"></span></div>
-<div id="erklaerung-btn-wrap" style="display:none;margin-top:.5rem">
-  <button onclick="sendeAnfrage()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:12.5px;color:var(--text3);cursor:pointer;font-family:Outfit,sans-serif;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">❓ Erklärung beim Trainer anfragen</button>
+<div id="erklaerung-btn-wrap" style="display:none;margin-top:.5rem;display:flex;gap:6px;flex-wrap:wrap">
+  <button onclick="sendeAnfrage()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:12.5px;color:var(--text3);cursor:pointer;font-family:Outfit,sans-serif;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">❓ Erklärung anfragen</button>
+  <button onclick="meldeFrage()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:12.5px;color:var(--text3);cursor:pointer;font-family:Outfit,sans-serif;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--amber)';this.style.color='var(--amber)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">⚠️ Frage melden</button>
 </div>
 </div>
 <div class="qctrl"><button class="bnxt" id="bnxt" onclick="nextQ()">Nächste Frage →</button></div>
@@ -2859,7 +2868,8 @@ function finishExam(){
   const cor=examAnswers.filter(a=>a.ok).length,tot=examAnswers.length,pct=Math.round(cor/tot*100);
   // Save exam result to store
   if(!store.examHistory)store.examHistory=[];
-  store.examHistory.unshift({date:new Date().toLocaleDateString("de-DE"),dateISO:new Date().toISOString(),cor,tot,pct,answers:examAnswers.map(a=>({qk:`${a.q.thema}|${a.q.nr}|${a.q.stufe}`,ok:a.ok}))});
+  updatePersonalRecords();
+  store.examHistory.unshift({date:new Date().toLocaleDateString("de-DE"),dateISO:new Date().toISOString(),cor,tot,pct,answers:examAnswers.map(a=>({qk:`${a.q.thema}|${a.q.nr}|${a.q.stufe}`,frage:a.q.frage,thema:a.q.thema,ok:a.ok,given:a.given,correct:a.q.antworten.find(x=>x.korrekt)?.text||""}))});
   if(store.examHistory.length>20)store.examHistory.pop();
   saveStore();
   let em,ti,su;
@@ -3299,6 +3309,8 @@ function onLogin() {
   renderPodium();
   resetSessionTimer();
   renderLernhilfe();
+  updatePersonalRecords();
+  const recsEl = document.getElementById("home-records"); if(recsEl) recsEl.innerHTML = renderPersonalRecords();
   // Update rank
   { const rs = calcRankScore(store); const re = document.getElementById("hero-rank"); if (re) re.innerHTML = getRankHTML(rs); }
   // Show onboarding for new users
@@ -3693,6 +3705,70 @@ function setTrainerView(view) {
     btnAnfragen.className = "bp"; btnAnfragen.style.fontSize = "12.5px"; btnAnfragen.style.padding = "7px 12px";
     renderAnfragen();
   }
+}
+
+// ─── PERSÖNLICHE REKORDE ─────────────────────────────────────
+function updatePersonalRecords() {
+  if (!store) return;
+  if (!store.records) store.records = {};
+  const r = store.records;
+  // Best exam score
+  const exams = store.examHistory || [];
+  if (exams.length) {
+    const best = Math.max(...exams.map(e => e.pct));
+    if (!r.bestExam || best > r.bestExam) {
+      r.bestExam = best;
+      if (r.bestExam === best && exams[0].pct === best) showRecordToast("🏆 Neue Bestleistung in der Prüfung!", best + "%");
+    }
+  }
+  // Best streak
+  const streak = store.streak?.count || 0;
+  if (!r.bestStreak || streak > r.bestStreak) {
+    if (r.bestStreak && streak > r.bestStreak) showRecordToast("🔥 Neuer Streak-Rekord!", streak + " Tage");
+    r.bestStreak = streak;
+  }
+  // Best session score
+  const hist = store.history || [];
+  if (hist.length) {
+    const bestSession = Math.max(...hist.map(h => h.pct));
+    if (!r.bestSession || bestSession > r.bestSession) {
+      r.bestSession = bestSession;
+    }
+  }
+  saveStore();
+}
+
+function showRecordToast(title, value) {
+  launchConfetti();
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:2px solid #FFD700;border-radius:var(--radius-lg);padding:1.5rem 2rem;text-align:center;z-index:9998;box-shadow:0 8px 32px rgba(0,0,0,.3)";
+  toast.innerHTML = `<div style="font-size:40px;margin-bottom:.5rem">🏅</div><div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:16px;margin-bottom:.3rem">${title}</div><div style="font-size:20px;font-weight:800;color:#FFD700">${value}</div>`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+function renderPersonalRecords() {
+  const r = store.records || {};
+  const streak = store.streak?.count || 0;
+  const totalAnswers = Object.values(store.qstats||{}).reduce((a,v)=>a+(v.total||0),0);
+  const correctAnswers = Object.values(store.qstats||{}).reduce((a,v)=>a+(v.correct||0),0);
+
+  const items = [
+    { icon: "🏆", label: "Beste Prüfung", value: r.bestExam !== undefined ? r.bestExam + "%" : "–" },
+    { icon: "🔥", label: "Längster Streak", value: r.bestStreak ? r.bestStreak + " Tage" : "–" },
+    { icon: "📝", label: "Beste Sitzung", value: r.bestSession !== undefined ? r.bestSession + "%" : "–" },
+    { icon: "✅", label: "Richtige Antworten", value: correctAnswers.toLocaleString("de-DE") },
+  ];
+
+  return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem 1.25rem;box-shadow:var(--shadow-sm);margin-bottom:1.25rem">
+    <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;margin-bottom:.75rem">🏅 Meine Rekorde</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+      ${items.map(i => `<div style="background:var(--bg3);border-radius:var(--radius-sm);padding:.6rem .8rem;display:flex;align-items:center;gap:8px">
+        <span style="font-size:20px">${i.icon}</span>
+        <div><div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:14px">${i.value}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">${i.label}</div></div>
+      </div>`).join("")}
+    </div>
+  </div>`;
 }
 
 // ─── FEUERWEHR-RÄNGE ─────────────────────────────────────────
@@ -4368,6 +4444,11 @@ function renderGroupProgress() {
   `;
 }
 
+function togglePruefungDetails(id) {
+  const el = document.getElementById("pruefung-details-" + id);
+  if (el) el.style.display = el.style.display === "none" ? "table-row" : "none";
+}
+
 function renderPruefungsauswertung() {
   const el = document.getElementById("trainer-pruefung");
   if (!trainerParticipants.length) { el.innerHTML = "<div style='color:var(--text3);padding:1rem'>Keine Teilnehmer vorhanden.</div>"; return; }
@@ -4396,7 +4477,24 @@ function renderPruefungsauswertung() {
           <td style="text-align:center;padding:8px">${trendHTML}</td>
           <td style="text-align:center;padding:8px;font-size:12px;color:var(--text3)">${hist.length}×</td>
           <td style="text-align:center;padding:8px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:${last.pct>=70?'var(--green-l)':'var(--red-l)'};color:${last.pct>=70?'var(--green-d)':'var(--red-d)'}">${last.pct>=70?'✓ Bestanden':'✗ Nicht bestanden'}</span></td>
-        </tr>`;
+          <td style="text-align:center;padding:8px">${last.answers ? `<button onclick="togglePruefungDetails('${p.id}_0')" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;color:var(--text2)">🔍 Details</button>` : '<span style="font-size:11px;color:var(--text3)">–</span>'}</td>
+        </tr>
+        ${last.answers ? `<tr id="pruefung-details-${p.id}_0" style="display:none">
+          <td colspan="8" style="padding:0 8px 12px">
+            <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px;margin-top:4px">
+              <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Letzte Prüfung – Alle Fragen</div>
+              ${last.answers.map((a,i) => `
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+                  <span style="font-size:14px;flex-shrink:0">${a.ok?'✅':'❌'}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12px;color:var(--text2);margin-bottom:2px">${a.frage||a.qk}</div>
+                    <div style="font-size:11px;color:${a.ok?'var(--green)':'var(--red)'}">Gewählt: ${a.given||'–'}</div>
+                    ${!a.ok && a.correct ? `<div style="font-size:11px;color:var(--green)">Richtig: ${a.correct}</div>` : ''}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </td>
+        </tr>` : ''}`;
     }).join("");
 
   const noData = trainerParticipants.filter(p => !p.store?.examHistory?.length);
@@ -4415,6 +4513,7 @@ function renderPruefungsauswertung() {
               <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Trend</th>
               <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Versuche</th>
               <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Status</th>
+              <th style="text-align:center;padding:6px 8px;font-size:12px;font-family:'Outfit',sans-serif">Details</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -4425,6 +4524,56 @@ function renderPruefungsauswertung() {
       </div>` : ""}
     </div>
   `;
+}
+
+async function meldeFrage() {
+  const ebw = document.getElementById("erklaerung-btn-wrap");
+  if (!ebw || !currentUser) return;
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:400px;box-shadow:var(--shadow-lg)">
+      <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:16px;margin-bottom:.4rem">⚠️ Frage melden</div>
+      <div style="font-size:12.5px;color:var(--text3);margin-bottom:1rem">Was stimmt mit dieser Frage nicht?</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem">
+        ${["Frage ist falsch/unvollständig","Antwort ist falsch","Frage ist unklar formuliert","Technisches Problem","Sonstiges"].map(r =>
+          `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:var(--radius-sm);background:var(--bg3)">
+            <input type="radio" name="meldegrund" value="${r}" style="accent-color:var(--red)">
+            <span style="font-size:13px">${r}</span>
+          </label>`).join("")}
+      </div>
+      <textarea id="melde-kommentar" placeholder="Optionaler Kommentar..." style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:Inter,sans-serif;background:var(--bg3);color:var(--text);resize:none;outline:none;margin-bottom:.75rem"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;color:var(--text2)">Abbrechen</button>
+        <button onclick="sendeMeldung(this,'${ebw.dataset.qkey}','${ebw.dataset.qtext?.replace(/'/g,"\'")}','${ebw.dataset.thema}')" style="background:#e65100;color:white;border:none;border-radius:var(--radius-sm);padding:8px 18px;font-size:13px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:700">Melden</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+}
+
+async function sendeMeldung(btn, qkey, qtext, thema) {
+  const grund = document.querySelector('input[name="meldegrund"]:checked')?.value;
+  if (!grund) { alert("Bitte einen Grund auswählen."); return; }
+  const kommentar = document.getElementById("melde-kommentar")?.value || "";
+  btn.disabled = true; btn.textContent = "Wird gesendet...";
+  const sb = await initSupabase();
+  await sb.from("fragen_meldungen").insert({
+    teilnehmer_id: currentUser.id,
+    teilnehmer_name: currentProfile.name,
+    frage_key: qkey,
+    frage_text: qtext,
+    thema,
+    grund,
+    kommentar,
+    erledigt: false
+  });
+  btn.closest("[style*=fixed]").remove();
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--amber);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999";
+  toast.textContent = "✓ Frage gemeldet – danke!";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
 }
 
 async function sendeAnfrage() {
@@ -4987,6 +5136,35 @@ async function resetPassword(id, name) {
     setTimeout(() => toast.remove(), 3000);
   };
   input.focus();
+}
+
+async function loadMeldungen() {
+  const el = document.getElementById("admin-meldungen-list");
+  el.innerHTML = "<div style='color:var(--text3);font-size:13px'>Wird geladen...</div>";
+  const sb = await initSupabase();
+  const { data } = await sb.from("fragen_meldungen").select("*").order("created_at", { ascending: false });
+  if (!data?.length) { el.innerHTML = "<div style='color:var(--green);font-size:13px'>✓ Keine Meldungen vorhanden.</div>"; return; }
+  const open = data.filter(m => !m.erledigt);
+  const done = data.filter(m => m.erledigt);
+  el.innerHTML = `
+    ${open.length ? `<div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px">${open.length} offene Meldungen</div>
+    ${open.map(m => `<div style="background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px;border-left:3px solid var(--amber)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:3px">⚠️ ${m.grund}</div>
+          <div style="font-size:12.5px;color:var(--text2);margin-bottom:3px">${m.frage_text?.slice(0,80)||m.frage_key}${m.frage_text?.length>80?"…":""}</div>
+          <div style="font-size:11px;color:var(--text3)">${m.teilnehmer_name} · ${new Date(m.created_at).toLocaleDateString("de-DE")}${m.kommentar?" · "+m.kommentar:""}</div>
+        </div>
+        <button onclick="erledigeMeldung('${m.id}')" style="background:var(--green-l);border:none;border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;color:var(--green-d);cursor:pointer;font-family:Outfit,sans-serif;font-weight:700;flex-shrink:0">✓ Erledigt</button>
+      </div>
+    </div>`).join("")}` : "<div style='color:var(--green);font-size:13px;margin-bottom:8px'>✓ Keine offenen Meldungen!</div>"}
+    ${done.length ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">${done.length} erledigte Meldungen</div>` : ""}`;
+}
+
+async function erledigeMeldung(id) {
+  const sb = await initSupabase();
+  await sb.from("fragen_meldungen").update({ erledigt: true }).eq("id", id);
+  loadMeldungen();
 }
 
 async function runEmailMigration() {
