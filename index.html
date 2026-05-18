@@ -1212,8 +1212,6 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
   .hi{padding:0 .85rem;height:52px}
   .logo-sub{display:none}
   .logo-title{font-size:11px!important}
-  .user-name{display:none!important}
-  .user-pill{padding:4px 6px!important;min-width:32px;justify-content:center}
   .logo-title{font-size:11px}
   .logo-sub{display:none}
   .hero{padding:1.1rem 1.25rem;flex-direction:column;gap:.85rem;align-items:flex-start}
@@ -3392,11 +3390,14 @@ function onLogin() {
   const rankEl = document.getElementById("hero-rank");
   if (rankEl) rankEl.innerHTML = getRankHTML(rankScore);
   const pill = document.getElementById("user-pill");
-  pill.style.display = "flex";
+  pill.style.cssText = "display:flex!important;align-items:center;gap:8px;cursor:pointer;padding:5px 10px;border-radius:99px;transition:background .15s";
   const av = document.getElementById("user-avatar-hdr");
   av.textContent = currentProfile.name.charAt(0).toUpperCase();
   av.className = "user-avatar role-" + currentProfile.role;
-  document.getElementById("user-name-hdr").textContent = currentProfile.name;
+  const nameEl = document.getElementById("user-name-hdr");
+  nameEl.textContent = currentProfile.name;
+  // Hide name on small screens
+  if (window.innerWidth < 600) nameEl.style.display = "none";
   document.getElementById("drop-name").textContent = currentProfile.name;
   const roleLabels = { teilnehmer:"Teilnehmer", trainer:"Trainer", admin:"Administrator" };
   document.getElementById("drop-role").textContent = roleLabels[currentProfile.role] || currentProfile.role;
