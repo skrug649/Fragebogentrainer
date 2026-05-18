@@ -4429,7 +4429,7 @@ async function joinLiveSession() {
   document.getElementById("vote-question").style.display = "block";
   showVoteQuestion(session);
 
-  // Subscribe to next question broadcasts on the SAME channel as votes
+  // Subscribe to next question and end events
   voteChannel = sb.channel("live-" + code)
     .on("broadcast", { event: "next" }, ({ payload }) => {
       document.getElementById("vote-voted").style.display = "none";
@@ -4437,6 +4437,16 @@ async function joinLiveSession() {
       if (payload.quiz && payload.quiz[0]) {
         showVoteQuestion({ quiz: payload.quiz, qidx: 0 });
       }
+    })
+    .on("broadcast", { event: "end" }, () => {
+      const qEl = document.getElementById("vote-question");
+      if (qEl) qEl.innerHTML = `
+        <div style="text-align:center;padding:2rem">
+          <div style="font-size:48px;margin-bottom:1rem">🏁</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:20px;margin-bottom:.5rem">Abstimmung beendet!</div>
+          <div style="font-size:13px;color:var(--text3);margin-bottom:1.5rem">Die Session wurde vom Trainer beendet.</div>
+          <button onclick="closeVoteScreen()" style="background:var(--red);color:white;border:none;border-radius:var(--radius-md);padding:12px 24px;font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;cursor:pointer">Schließen</button>
+        </div>`;
     })
     .subscribe();
 }
@@ -4505,10 +4515,25 @@ function openBeamer() {
 }
 
 function closeBeamer() {
-  document.getElementById("screen-beamer").style.display = "none";
+  // Show ranking if there were any votes
+  if (Object.keys(liveVoterScores).length > 0) {
+    document.getElementById("beamer-live").style.display = "none";
+    document.getElementById("beamer-setup").style.display = "none";
+    document.getElementById("beamer-quiz").style.display = "none";
+    document.getElementById("beamer-end").style.display = "none";
+    showLiveRanking();
+    // Trainer closes manually via buttons in ranking screen
+  } else {
+    document.getElementById("screen-beamer").style.display = "none";
+  }
   if (liveChannel) { liveChannel.unsubscribe(); liveChannel = null; }
-  // Mark session as inactive in DB
   initSupabase().then(sb => sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ active: false }) }));
+  // Notify participants session ended
+  if (liveSession) {
+    initSupabase().then(sb => sb.channel("live-" + liveSession).send({
+      type: "broadcast", event: "end", payload: {}
+    }));
+  }
 }
 
 function startBeamer() {
