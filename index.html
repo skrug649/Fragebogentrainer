@@ -4469,6 +4469,8 @@ async function sendVote(answerIdx) {
 
 function showLiveRanking() {
   document.getElementById("beamer-ranking").style.display = "flex";
+  // Mark session as inactive
+  initSupabase().then(sb => sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ active: false }) }));
   const scores = Object.entries(liveVoterScores)
     .map(([name, s]) => ({ name, correct: s.correct || 0, total: liveQuiz.length }))
     .sort((a, b) => b.correct - a.correct);
@@ -4504,6 +4506,9 @@ function openBeamer() {
 
 function closeBeamer() {
   document.getElementById("screen-beamer").style.display = "none";
+  if (liveChannel) { liveChannel.unsubscribe(); liveChannel = null; }
+  // Mark session as inactive in DB
+  initSupabase().then(sb => sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ active: false }) }));
 }
 
 function startBeamer() {
