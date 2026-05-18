@@ -1497,7 +1497,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
     <div id="beamer-ranking-list" style="margin:1.5rem 0;width:100%;max-width:500px"></div>
     <div style="display:flex;gap:1rem;justify-content:center">
       <button onclick="openBeamer()" style="background:#cc0000;color:white;border:none;border-radius:10px;padding:14px 28px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer">🔄 Neue Runde</button>
-      <button onclick="closeBeamer()" style="background:#2a2a2a;color:white;border:1px solid #444;border-radius:10px;padding:14px 28px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer">✕ Beenden</button>
+      <button onclick="beamerSchliessen()" style="background:#2a2a2a;color:white;border:1px solid #444;border-radius:10px;padding:14px 28px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer">✕ Beenden</button>
     </div>
   </div>
 
@@ -3382,6 +3382,8 @@ function onLogin() {
   { const rs = calcRankScore(store); const re = document.getElementById("hero-rank"); if (re) re.innerHTML = getRankHTML(rs); }
   // Show onboarding for new users
   if (!store.onboardingSeen) setTimeout(showOnboarding, 800);
+  // Show new features banner for existing users
+  else if (!store.newFeaturesBanner2) setTimeout(showNewFeaturesBanner, 1200);
   checkNotifications();
   checkExamReactions();
   // Show PWA install banner for existing users (once)
@@ -4253,12 +4255,13 @@ document.getElementById("notif-modal").addEventListener("click", function(e) {
 // ─── ONBOARDING ─────────────────────────────────────────────
 const TRAINER_OB_STEPS = [
   { icon: "👥", title: "Willkommen in der Trainer-Ansicht!", text: "Hier hast du alle Werkzeuge um den Lernfortschritt deiner Gruppe zu verfolgen und zu steuern. Lass uns die wichtigsten Funktionen kurz erklären." },
-  { icon: "📈", title: "Gruppenfortschritt", text: "Ganz oben siehst du den Überblick: wie weit die Gruppe insgesamt ist, die Trefferquote, wer inaktiv ist und wie viele Tage bis zur Kreisübung noch bleiben." },
-  { icon: "🔍", title: "Schwachstellen & Empfehlungen", text: "Unter 'Schwachstellen' siehst du welche Themen am schlechtesten laufen. Unter 'Empfehlungen' bekommst du konkrete Hinweise was du als Trainer tun kannst." },
-  { icon: "❓", title: "Anfragen & Kommentare", text: "Wenn ein Teilnehmer eine Frage nicht versteht kann er eine Erklärung anfragen. Du siehst alle Anfragen hier und kannst direkt einen Kommentar hinterlassen – der Teilnehmer bekommt eine Benachrichtigung." },
-  { icon: "📽️", title: "Beamer-Modus", text: "Für Gruppenübungen am Smartboard! Starte den Beamer-Modus, wähle Thema und Stufe, und tippe auf eine Antwort um sie aufzudecken. Läuft auf jedem Gerät im Browser." },
-  { icon: "🏅", title: "Rang-System", text: "Jeder Teilnehmer hat einen Rang basierend auf Fortschritt und Trefferquote – von Anwärter bis Brandmeister. Im Admin-Bereich kannst du Geschlecht einstellen damit der richtige Rang angezeigt wird." },
-  { icon: "📄", title: "PDF-Export & Prüfungen", text: "Mit 'PDF' exportierst du einen vollständigen Trainerbericht. Unter 'Prüfungen' siehst du alle Prüfungssimulations-Ergebnisse deiner Teilnehmer mit Trend und Bestleistung." }
+  { icon: "📈", title: "Gruppenfortschritt", text: "Ganz oben siehst du den Überblick: wie weit die Gruppe insgesamt ist, die Trefferquote, wer inaktiv ist und wie viele Tage bis zur Kreisübung noch bleiben. Die Karten der Teilnehmer zeigen Rang, Verbesserungsrate, schwächste Frage und Lernzeit-Schätzung." },
+  { icon: "🔍", title: "Schwachstellen & Empfehlungen", text: "Unter 'Schwachstellen' siehst du welche Themen am schlechtesten laufen und die schwierigste Frage der Woche. Unter 'Empfehlungen' bekommst du konkrete Hinweise was du als Trainer tun kannst." },
+  { icon: "⚖️", title: "Vergleich & Prüfungen", text: "Unter 'Vergleich' kannst du zwei Teilnehmer direkt gegenüberstellen. Unter 'Prüfungen' siehst du alle Ergebnisse mit Details – und kannst mit 👍🔥💪 auf Prüfungen reagieren. Teilnehmer sehen deine Reaktion beim nächsten Login!" },
+  { icon: "❓", title: "Anfragen & Kommentare", text: "Wenn ein Teilnehmer eine Frage nicht versteht kann er eine Erklärung anfragen. Du siehst alle Anfragen und kannst direkt einen Kommentar hinterlassen – der Teilnehmer bekommt beim nächsten Login eine Benachrichtigung." },
+  { icon: "📽️", title: "Beamer & Live-Abstimmung", text: "Für Gruppenübungen am Smartboard! Wähle zwischen normalem Beamer-Modus (antippen zum Aufdecken) oder Live-Abstimmung – Teilnehmer stimmen per Handy ab und am Ende gibt es ein Ranking!" },
+  { icon: "🏅", title: "Rang-System & Admin", text: "Jeder Teilnehmer hat einen Feuerwehr-Rang basierend auf Fortschritt UND Trefferquote. Im Admin-Bereich kannst du Geschlecht, Rollen und Fortschritt verwalten sowie gemeldete Fragen prüfen." },
+  { icon: "📄", title: "PDF-Export & Heatmap", text: "Mit 'PDF' exportierst du einen vollständigen Trainerbericht. In jeder Teilnehmerkarte findest du eine Aktivitäts-Heatmap der letzten 10 Wochen und einen Themen-Radar." }
 ];
 let trainerObStep = 0;
 
@@ -4296,10 +4299,12 @@ function trainerObRender() {
 
 const OB_STEPS = [
   { icon: "🔥", title: "Willkommen beim Fragenbogentrainer!", text: "Diese App hilft dir dich optimal auf die Kreisübung der Jugendfeuerwehr Mengeringhausen vorzubereiten. Lass uns kurz erklären wie alles funktioniert." },
-  { icon: "📖", title: "Fragebogen", text: "Unter 'Fragebogen' findest du alle Fragen nach Thema sortiert. Du kannst einzelne Themen gezielt üben oder alle Fragen auf einmal. Richtige Antworten werden grün markiert, falsche rot." },
-  { icon: "🎯", title: "Prüfungsmodus", text: "Der Prüfungsmodus simuliert die echte Prüfung: 15 Fragen, kein Feedback während der Runde. Erst am Ende siehst du dein Ergebnis. Nutze ihn um dich zu testen!" },
-  { icon: "📊", title: "Statistik & Fortschritt", text: "In der Statistik siehst du deinen Fortschritt pro Thema, deine Trefferquote und wie du dich über Zeit verbesserst. Dein Fortschritt wird automatisch gespeichert." },
-  { icon: "🏆", title: "Wochenpodium", text: "Auf der Startseite siehst du das Wochenpodium – wer hat diese Woche die meisten Fragen richtig beantwortet? Jeden Mittwoch um 17 Uhr wird der Champion der Woche gekürt. Viel Erfolg!" },
+  { icon: "📖", title: "Fragebogen & Rundengröße", text: "Unter 'Fragebogen' findest du alle Fragen nach Thema sortiert. Du kannst die Rundengröße wählen: 5, 10, 15, 20 oder alle Fragen. Nach einer falschen Antwort kannst du eine Erklärung beim Trainer anfragen oder eine Frage melden." },
+  { icon: "🎯", title: "Prüfungsmodus", text: "Der Prüfungsmodus simuliert die echte Prüfung: 15 Fragen, kein Feedback während der Runde. Wähle deine Antwort und bestätige sie – du kannst vorher noch wechseln. Dein Trainer sieht dein Ergebnis und kann darauf reagieren!" },
+  { icon: "🏅", title: "Feuerwehr-Ränge", text: "Je mehr du übst und je besser deine Trefferquote wird, desto höher steigst du auf – von Anwärter/in bis zum Brandmeister/in. Der Rang erscheint auf deiner Startseite und basiert auf Fortschritt und Trefferquote." },
+  { icon: "📊", title: "Statistik & Rekorde", text: "In der Statistik siehst du deinen Fortschritt pro Thema. Auf der Startseite findest du deine persönlichen Rekorde – beste Prüfung, längster Streak und mehr. Dein Fortschritt wird automatisch gespeichert." },
+  { icon: "🏆", title: "Wochenpodium & Streak", text: "Wer übt am meisten diese Woche? Das Wochenpodium auf der Startseite zeigt es! Jeden Mittwoch um 17 Uhr wird der Champion der Woche gekürt. Übe täglich um deinen Streak zu halten – je länger desto mehr Flammen! 🔥" },
+  { icon: "📱", title: "Live-Abstimmung", text: "Wenn dein Trainer eine Gruppenübung am Smartboard startet erscheint automatisch ein Banner auf der Startseite. Tippe drauf, gib den Session-Code ein und stimme auf deinem Handy ab!" },
   { icon: "📲", title: "App installieren!", text: "Du kannst diese App direkt auf deinem Homescreen installieren – startet dann wie eine echte App ohne Browser!\n\n🤖 Android: Drei Punkte ⋮ → 'Zum Startbildschirm'\n🍎 iPhone: Teilen ⬆️ → 'Zum Home-Bildschirm'\n\nOder über dein Profilmenü → 📲 App installieren." }
 ];
 let obCurrentStep = 0;
@@ -4641,6 +4646,13 @@ function openBeamer() {
   document.getElementById("beamer-setup").style.display = "flex";
   document.getElementById("beamer-quiz").style.display = "none";
   document.getElementById("beamer-end").style.display = "none";
+}
+
+function beamerSchliessen() {
+  document.getElementById("screen-beamer").style.display = "none";
+  document.getElementById("beamer-ranking").style.display = "none";
+  liveVoterScores = {};
+  liveSession = null;
 }
 
 async function closeBeamer() {
@@ -6104,6 +6116,42 @@ window.addEventListener("beforeinstallprompt", e => {
   e.preventDefault();
   deferredPrompt = e;
 });
+
+function showNewFeaturesBanner() {
+  if (store.newFeaturesBanner2) return;
+  store.newFeaturesBanner2 = true;
+  saveStore();
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;display:flex;align-items:center;justify-content:center;padding:1rem";
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:0;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">
+      <div style="background:var(--red);padding:1rem 1.5rem;display:flex;align-items:center;gap:10px">
+        <span style="font-size:28px">🆕</span>
+        <div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:17px;color:white">Neue Features!</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.8)">Was neu ist in der App</div>
+        </div>
+      </div>
+      <div style="padding:1.25rem 1.5rem">
+        <div style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.25rem">
+          ${[
+            ["🏅","Feuerwehr-Ränge","Von Anwärter/in bis Brandmeister/in – basierend auf Fortschritt & Trefferquote"],
+            ["📱","Live-Abstimmung","Stimme bei Gruppenübungen per Handy ab – Banner erscheint automatisch"],
+            ["👍","Trainer-Reaktionen","Dein Trainer kann mit 👍🔥💪 auf deine Prüfungen reagieren"],
+            ["🏆","Persönliche Rekorde","Beste Prüfung, längster Streak und mehr auf der Startseite"],
+            ["💡","Lernhilfe","Tagesplan mit empfohlenen Themen – über Profilmenü aufrufen"],
+          ].map(([icon,title,text]) => `
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px;background:var(--bg3);border-radius:var(--radius-sm)">
+              <span style="font-size:20px;flex-shrink:0">${icon}</span>
+              <div><div style="font-size:13px;font-weight:700;margin-bottom:1px">${title}</div><div style="font-size:11.5px;color:var(--text3)">${text}</div></div>
+            </div>`).join("")}
+        </div>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:12px;font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;cursor:pointer">Verstanden! 🎉</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+}
 
 function showPWABanner() {
   if (store.pwabannerSeen) return;
