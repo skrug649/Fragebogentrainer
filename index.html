@@ -1470,6 +1470,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <div id="beamer-prog" style="height:100%;background:#cc0000;border-radius:99px;transition:width .4s"></div>
     </div>
     <div id="beamer-thema-tag" style="font-size:13px;font-weight:700;color:#cc0000;letter-spacing:1px;text-transform:uppercase;margin-bottom:1rem;flex-shrink:0"></div>
+    <img id="beamer-img" src="" alt="" style="display:none;max-height:180px;max-width:280px;margin:0 auto .75rem;border-radius:8px;border:1px solid rgba(255,255,255,.2)">
     <div id="beamer-question" style="font-family:'Outfit',sans-serif;font-weight:900;font-size:clamp(20px,3.5vw,40px);line-height:1.3;color:white;margin-bottom:2.5rem;flex:1"></div>
     <div id="beamer-answers" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem;flex-shrink:0;overflow:hidden"></div>
     <div style="display:flex;justify-content:center;gap:1rem;flex-shrink:0;padding-bottom:1rem">
@@ -1940,6 +1941,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 </div>
 <div class="qcard">
 <div class="qmeta"><span class="qs1 qex">Prüfung</span><span class="qth" id="eq-th"></span><span class="qnr" id="eq-nr"></span></div>
+<img id="eq-img" src="" alt="" style="display:none;max-width:200px;margin:0 auto .75rem;border-radius:8px;border:1px solid var(--border)">
 <div class="qtxt" id="eq-txt"></div>
 <div class="ans" id="eq-ac"></div>
 </div>
@@ -2906,6 +2908,8 @@ function showExamQ(){
   document.getElementById("eq-th").textContent=q.thema;
   document.getElementById("eq-nr").textContent="Nr. "+q.nr;
   document.getElementById("eq-txt").textContent=q.frage;
+  const eqImg = document.getElementById("eq-img");
+  if (eqImg) { const src = getQImg(q); eqImg.src = src||""; eqImg.style.display = src ? "block" : "none"; }
   const sa=shuffle(q.antworten.map(a=>({...a})));
   const ac=document.getElementById("eq-ac");ac.innerHTML="";
   sa.forEach((a,i)=>{
@@ -4487,40 +4491,50 @@ function liveShowQ() {
 
 function updateLiveBars() {
   const total = Object.values(liveVotes).reduce((a,b)=>a+b,0);
-  document.getElementById("beamer-live-voters").textContent = total + " Antwort" + (total!==1?"en":"");
+  // Only show total count before reveal - not distribution
+  document.getElementById("beamer-live-voters").textContent = total + " Antwort" + (total!==1?"en":"") + " eingegangen";
+  // Hide individual bars until reveal
   liveQuiz[liveIdx].antworten.forEach((a,i) => {
-    const count = liveVotes[i] || 0;
-    const pct = total ? Math.round(count/total*100) : 0;
-    const fill = document.getElementById("live-barfill-" + i);
-    const cnt = document.getElementById("live-count-" + i);
     const bar = document.getElementById("live-bar-" + i);
-    if (bar) bar.style.display = "flex";
-    if (fill) fill.style.width = pct + "%";
-    if (cnt) cnt.textContent = count;
+    if (bar) bar.style.display = "none"; // Hidden until reveal
   });
 }
 
 function beamerLiveReveal() {
   liveRevealed = true;
   const q = liveQuiz[liveIdx];
-  // Find correct answer index
   const correctIdx = q.antworten.findIndex(a => a.korrekt);
+  const total = Object.values(liveVotes).reduce((a,b)=>a+b,0);
   // Update scores
   Object.keys(liveVoterScores).forEach(name => {
     if (liveVoterScores[name].answer === correctIdx) {
       liveVoterScores[name].correct = (liveVoterScores[name].correct || 0) + 1;
     }
   });
+  // Now show distribution
   q.antworten.forEach((a,i) => {
     const el = document.getElementById("live-ans-" + i);
     if (a.korrekt) { el.style.background="#0d3d1a"; el.style.borderColor="#2e7d32"; }
     else { el.style.opacity="0.4"; }
+    const count = liveVotes[i] || 0;
+    const pct = total ? Math.round(count/total*100) : 0;
+    const bar = document.getElementById("live-bar-" + i);
     const fill = document.getElementById("live-barfill-" + i);
-    if (fill && a.korrekt) fill.style.background = "#2e7d32";
+    const cnt = document.getElementById("live-count-" + i);
+    if (bar) bar.style.display = "flex";
+    if (fill) { fill.style.width = pct + "%"; if (a.korrekt) fill.style.background = "#2e7d32"; }
+    if (cnt) cnt.textContent = count;
   });
   document.getElementById("beamer-live-reveal-btn").style.display = "none";
   document.getElementById("beamer-live-next-btn").style.display = "block";
-  initSupabase().then(sb => sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ code: liveSession, active: true, qidx: liveIdx, revealed: true }) }));
+  initSupabase().then(sb => {
+    sb.from("settings").upsert({ key: "live_session", value: JSON.stringify({ code: liveSession, active: true, qidx: liveIdx, revealed: true }) });
+    // Notify participants of correct answer
+    sb.channel("live-" + liveSession).send({
+      type: "broadcast", event: "reveal",
+      payload: { correctIdx, qidx: liveIdx }
+    });
+  });
 }
 
 function beamerLiveNext() {
@@ -4607,6 +4621,18 @@ async function joinLiveSession() {
 
   // Subscribe to next question and end events
   voteChannel = sb.channel("live-" + code)
+    .on("broadcast", { event: "reveal" }, ({ payload }) => {
+      // Show correct/wrong feedback on participant phone
+      const votedEl = document.getElementById("vote-voted");
+      if (votedEl && payload.correctIdx !== undefined) {
+        const myAnswer = payload.myAnswerIdx;
+        const isCorrect = payload.myAnswerIdx === payload.correctIdx;
+        votedEl.innerHTML = isCorrect
+          ? `<div style="font-size:48px;margin-bottom:.5rem">✅</div><div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;color:var(--green)">Richtig!</div>`
+          : `<div style="font-size:48px;margin-bottom:.5rem">❌</div><div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;color:var(--red)">Falsch!</div><div style="font-size:13px;color:var(--text3);margin-top:.3rem">Warte auf die nächste Frage...</div>`;
+        votedEl.style.display = "block";
+      }
+    })
     .on("broadcast", { event: "next" }, ({ payload }) => {
       document.getElementById("vote-voted").style.display = "none";
       document.getElementById("vote-answers").style.display = "flex";
@@ -4756,6 +4782,8 @@ function beamerShowQ() {
   document.getElementById("beamer-counter").textContent = (beamerIdx + 1) + " / " + beamerQuiz.length;
   document.getElementById("beamer-thema-tag").textContent = (ICONS[q.thema]||"📋") + " " + q.thema + " · Stufe " + q.stufe;
   document.getElementById("beamer-question").textContent = q.frage;
+  const bmImg = document.getElementById("beamer-img");
+  if (bmImg) { const src = getQImg(q); bmImg.src = src||""; bmImg.style.display = src ? "block" : "none"; }
   const keys = ["A", "B", "C", "D"];
   document.getElementById("beamer-answers").innerHTML = q.antworten.map((a, i) => `
     <div id="beamer-ans-${i}" onclick="beamerTap(${i})" style="background:#1a1a1a;border:2px solid #333;border-radius:12px;padding:1.2rem 1.5rem;display:flex;align-items:center;gap:14px;transition:all .3s;cursor:pointer;user-select:none"
