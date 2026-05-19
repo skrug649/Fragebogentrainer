@@ -4622,11 +4622,9 @@ async function joinLiveSession() {
   // Subscribe to next question and end events
   voteChannel = sb.channel("live-" + code)
     .on("broadcast", { event: "reveal" }, ({ payload }) => {
-      // Show correct/wrong feedback on participant phone
       const votedEl = document.getElementById("vote-voted");
-      if (votedEl && payload.correctIdx !== undefined) {
-        const myAnswer = payload.myAnswerIdx;
-        const isCorrect = payload.myAnswerIdx === payload.correctIdx;
+      if (votedEl && payload.correctIdx !== undefined && myVoteAnswer !== null) {
+        const isCorrect = myVoteAnswer === payload.correctIdx;
         votedEl.innerHTML = isCorrect
           ? `<div style="font-size:48px;margin-bottom:.5rem">✅</div><div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;color:var(--green)">Richtig!</div>`
           : `<div style="font-size:48px;margin-bottom:.5rem">❌</div><div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;color:var(--red)">Falsch!</div><div style="font-size:13px;color:var(--text3);margin-top:.3rem">Warte auf die nächste Frage...</div>`;
@@ -4634,6 +4632,7 @@ async function joinLiveSession() {
       }
     })
     .on("broadcast", { event: "next" }, ({ payload }) => {
+      myVoteAnswer = null;
       document.getElementById("vote-voted").style.display = "none";
       document.getElementById("vote-answers").style.display = "flex";
       if (payload.quiz && payload.quiz[0]) {
@@ -4659,7 +4658,7 @@ function showVoteQuestion(session) {
   const keys = ["A","B","C","D"];
   document.getElementById("vote-q-text").textContent = q.frage || "Frage wird geladen...";
   document.getElementById("vote-answers").innerHTML = (q.antworten||[]).map((a,i) => `
-    <button onclick="sendVote(${i})" style="background:var(--bg3);border:2px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:var(--text);font-family:'Inter',sans-serif;transition:all .15s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+    <button onclick="sendVote(${i},this)" style="background:var(--bg3);border:2px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:var(--text);font-family:'Inter',sans-serif;transition:all .15s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
       <div style="width:32px;height:32px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;color:white;flex-shrink:0">${keys[i]}</div>
       <span style="flex:1">${a.text}</span>
     </button>`).join("");
@@ -4667,8 +4666,11 @@ function showVoteQuestion(session) {
   document.getElementById("vote-answers").style.display = "flex";
 }
 
-async function sendVote(answerIdx) {
+let myVoteAnswer = null;
+
+async function sendVote(answerIdx, btnEl) {
   if (!currentVoteSession) return;
+  myVoteAnswer = answerIdx; // Save index for comparison
   const sb = await initSupabase();
   await sb.channel("live-" + currentVoteSession).send({
     type: "broadcast",
