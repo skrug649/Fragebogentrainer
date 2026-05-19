@@ -50,6 +50,28 @@ html,body{overflow-x:hidden;max-width:100vw}
   --radius-lg:14px;
   --radius-xl:18px;
 }
+/* ─── SEASONAL THEMES ───────────────────────────────────── */
+body.theme-weihnachten{--red:#1a8c1a;--red-l:rgba(26,140,26,.12);--red-d:#1a6b1a}
+body.theme-weihnachten header{background:linear-gradient(135deg,#1a5c1a,#2d8b2d)!important}
+body.theme-weihnachten .logo-title span{background:#c41e1e!important}
+
+body.theme-halloween{--red:#cc5500;--red-l:rgba(204,85,0,.12);--red-d:#aa4400}
+body.theme-halloween header{background:linear-gradient(135deg,#4a1a6b,#8b4513)!important}
+body.theme-halloween .logo-title span{background:#cc5500!important}
+
+body.theme-fruehling{--red:#2e7d32;--red-l:rgba(46,125,50,.12);--red-d:#1b5e20}
+body.theme-fruehling header{background:linear-gradient(135deg,#1b5e20,#4caf50)!important}
+body.theme-fruehling .logo-title span{background:#e91e8c!important}
+
+body.theme-sommer{--red:#0277bd;--red-l:rgba(2,119,189,.12);--red-d:#01579b}
+body.theme-sommer header{background:linear-gradient(135deg,#0277bd,#f9a825)!important}
+body.theme-sommer .logo-title span{background:#f9a825!important;color:#333!important}
+
+body.theme-kreisuebung{--red:#8b0000;--red-l:rgba(139,0,0,.12);--red-d:#8b0000}
+body.theme-kreisuebung header{background:linear-gradient(135deg,#8b0000,#cc0000)!important}
+body.theme-kreisuebung .logo-title span{background:#FFD700!important;color:#333!important}
+body.theme-kreisuebung .logo-sub{color:#FFD700!important}
+
 body.dark{
   --bg:#131314;
   --bg2:#1e1e20;
@@ -1687,6 +1709,13 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
     <div class="admin-section-title">⚠️ Gemeldete Fragen</div>
     <div class="admin-section-sub">Von Teilnehmern gemeldete Fehler oder Unklarheiten in Fragen.</div>
     <div id="admin-meldungen-list"><button class="bse" onclick="loadMeldungen()" style="font-size:12.5px;padding:7px 12px">🔄 Laden</button></div>
+  </div>
+
+  <!-- Saisonale Themen -->
+  <div class="admin-section">
+    <div class="admin-section-title">🎨 Saisonales Thema</div>
+    <div class="admin-section-sub">Wähle ein Thema für alle Teilnehmer.</div>
+    <div id="admin-theme-btns" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem"></div>
   </div>
 
   <!-- User management -->
@@ -3432,6 +3461,7 @@ function onLogin() {
   else if (!store.newFeaturesBanner2) setTimeout(showNewFeaturesBanner, 1200);
   checkNotifications();
   checkExamReactions();
+  loadTheme();
   // Show PWA install banner for existing users (once)
   if (store.onboardingSeen && !store.pwabannerSeen) setTimeout(showPWABanner, 1200);
 }
@@ -4491,12 +4521,12 @@ function liveShowQ() {
 
 function updateLiveBars() {
   const total = Object.values(liveVotes).reduce((a,b)=>a+b,0);
-  // Only show total count before reveal - not distribution
-  document.getElementById("beamer-live-voters").textContent = total + " Antwort" + (total!==1?"en":"") + " eingegangen";
+  const expected = trainerParticipants?.length || "?";
+  document.getElementById("beamer-live-voters").textContent = total + " von " + expected + " haben abgestimmt";
   // Hide individual bars until reveal
   liveQuiz[liveIdx].antworten.forEach((a,i) => {
     const bar = document.getElementById("live-bar-" + i);
-    if (bar) bar.style.display = "none"; // Hidden until reveal
+    if (bar) bar.style.display = "none";
   });
 }
 
@@ -4678,7 +4708,9 @@ async function sendVote(answerIdx, btnEl) {
     payload: { answer: answerIdx, user: currentProfile?.name || "Anonym" }
   });
   document.getElementById("vote-answers").style.display = "none";
-  document.getElementById("vote-voted").style.display = "block";
+  const vv = document.getElementById("vote-voted");
+  vv.innerHTML = `<div style="font-size:40px;margin-bottom:.5rem">⏳</div><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:16px">Antwort gesendet!</div><div style="font-size:13px;color:var(--text3);margin-top:.3rem">Warte auf die Auflösung...</div>`;
+  vv.style.display = "block";
 }
 
 function showLiveRanking() {
@@ -5746,6 +5778,9 @@ function renderComparisonTable() {
 
 // ─── ADMIN VIEW ────────────────────────────────────────────
 async function goAdmin() {
+  // Render theme buttons
+  const tbEl = document.getElementById("admin-theme-btns");
+  if (tbEl) tbEl.innerHTML = THEMES.map(t => `<button onclick="saveTheme('${t.key}')" style="background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;cursor:pointer;color:var(--text)">${t.label}</button>`).join("");
   if (!currentProfile || currentProfile.role !== "admin") {
     alert("Kein Zugriff – nur Admins können den Admin-Bereich öffnen.");
     return;
@@ -5820,6 +5855,62 @@ async function renderAdminUserList() {
         </div>` : `<span style="font-size:12px;color:var(--text3)">Eigenes Konto</span>`}
       </div>
     </div>`).join("") + `</div>`;
+}
+
+// ─── SAISONALE THEMEN ────────────────────────────────────────
+const THEMES = [
+  { key: "standard",    label: "🔥 Standard",    emoji: "🔥" },
+  { key: "weihnachten", label: "🎄 Weihnachten", emoji: "🎄" },
+  { key: "halloween",   label: "🎃 Halloween",    emoji: "🎃" },
+  { key: "fruehling",   label: "🌸 Frühling",     emoji: "🌸" },
+  { key: "sommer",      label: "☀️ Sommer",       emoji: "☀️" },
+  { key: "kreisuebung", label: "🚒 Kreisübung",   emoji: "🚒" },
+];
+
+async function loadTheme() {
+  try {
+    const sb = await initSupabase();
+    const { data } = await sb.from("settings").select("value").eq("key","seasonal_theme").maybeSingle();
+    const theme = data?.value ? JSON.parse(data.value) : "standard";
+    applyTheme(theme);
+  } catch(e) {}
+}
+
+function applyTheme(key) {
+  THEMES.forEach(t => document.body.classList.remove("theme-" + t.key));
+  if (key && key !== "standard") document.body.classList.add("theme-" + key);
+  // Update seasonal decorations
+  updateSeasonalDecorations(key);
+}
+
+function updateSeasonalDecorations(key) {
+  let existing = document.getElementById("seasonal-deco");
+  if (existing) existing.remove();
+  if (!key || key === "standard") return;
+  const decos = {
+    weihnachten: "❄️ Frohe Weihnachten ❄️",
+    halloween: "🎃 Happy Halloween 🎃",
+    fruehling: "🌸 Frühling ist da! 🌸",
+    sommer: "☀️ Schöner Sommer! ☀️",
+    kreisuebung: "🚒 Kreisübung rückt näher! 💪"
+  };
+  if (!decos[key]) return;
+  const bar = document.createElement("div");
+  bar.id = "seasonal-deco";
+  bar.style.cssText = "text-align:center;padding:5px;font-size:12px;font-weight:700;background:var(--red);color:white;letter-spacing:1px";
+  bar.textContent = decos[key];
+  document.querySelector("header")?.after(bar);
+}
+
+async function saveTheme(key) {
+  const sb = await initSupabase();
+  await sb.from("settings").upsert({ key: "seasonal_theme", value: JSON.stringify(key) });
+  applyTheme(key);
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999";
+  toast.textContent = "✓ Thema gespeichert!";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 }
 
 async function changeUserGeschlecht(id, geschlecht) {
