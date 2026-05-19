@@ -4430,6 +4430,7 @@ let beamerQuiz = [], beamerIdx = 0, beamerRevealed = false;
 
 // ─── LIVE ABSTIMMUNG ─────────────────────────────────────────
 let liveSession = null;
+let liveParticipantCount = 0;
 let liveChannel = null;
 let liveVotes = {};
 let liveVoterScores = {}; // name -> {correct, total}
@@ -4455,7 +4456,13 @@ async function startLiveAbstimmung() {
   liveVotes = {};
   liveVoterScores = {};
   liveRevealed = false;
+  liveParticipantCount = 0;
   document.getElementById("beamer-ranking").style.display = "none";
+  // Load participant count from DB
+  initSupabase().then(async sb => {
+    const { data } = await sb.from("profiles").select("id").eq("role","teilnehmer");
+    liveParticipantCount = data?.length || 0;
+  });
 
   // Hide setup, show live screen
   document.getElementById("beamer-setup").style.display = "none";
@@ -4521,7 +4528,7 @@ function liveShowQ() {
 
 function updateLiveBars() {
   const total = Object.values(liveVotes).reduce((a,b)=>a+b,0);
-  const expected = trainerParticipants?.length || "?";
+  const expected = liveParticipantCount || trainerParticipants?.length || "?";
   document.getElementById("beamer-live-voters").textContent = total + " von " + expected + " haben abgestimmt";
   // Hide individual bars until reveal
   liveQuiz[liveIdx].antworten.forEach((a,i) => {
