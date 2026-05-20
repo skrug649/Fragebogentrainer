@@ -1895,7 +1895,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <button onclick="meldeFrage()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:12.5px;color:var(--text3);cursor:pointer;font-family:Outfit,sans-serif;font-weight:600;display:flex;align-items:center;gap:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--amber)';this.style.color='var(--amber)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">⚠️ Frage melden</button>
 </div>
 </div>
-<div class="qctrl"><button class="bnxt" id="bnxt" onclick="nextQ()">Nächste Frage →</button></div>
+<div class="qctrl" style="display:flex;flex-direction:column;gap:.5rem;align-items:stretch"><button class="bnxt" id="q-confirm" onclick="confirmAnswer()" style="display:none;background:var(--red)">✓ Antwort bestätigen</button><button class="bnxt" id="bnxt" onclick="nextQ()">Nächste Frage →</button></div>
 </div>
 
 <!-- RESULTS -->
@@ -2375,13 +2375,31 @@ function showQ(){
   });
   document.getElementById("fbb").className="fb";
   document.getElementById("bnxt").className="bnxt";
+  const conf=document.getElementById("q-confirm");if(conf)conf.style.display="none";
+  selectedBtn=null;selectedOk=null;selectedSa=null;selectedQ=null;
   updBookmarkBtn(q);
   updDots();
 }
+let selectedBtn=null, selectedOk=null, selectedSa=null, selectedQ=null;
+
 function pick(btn,ok,sa,q){
-  if(answered)return;answered=true;
-  recordAnswer(q,ok);
-  document.querySelectorAll("#ac .ab").forEach(b=>b.disabled=true);
+  if(answered)return;
+  // Deselect previous
+  document.querySelectorAll("#ac .ab").forEach(b=>b.classList.remove("sel"));
+  btn.classList.add("sel");
+  selectedBtn=btn; selectedOk=ok; selectedSa=sa; selectedQ=q;
+  // Show confirm button
+  const conf = document.getElementById("q-confirm");
+  if(conf) conf.style.display="block";
+}
+
+function confirmAnswer(){
+  if(answered || !selectedBtn)return;
+  answered=true;
+  const btn=selectedBtn, ok=selectedOk, sa=selectedSa, q=selectedQ;
+  const conf = document.getElementById("q-confirm");
+  if(conf) conf.style.display="none";
+  document.querySelectorAll("#ac .ab").forEach(b=>{ b.disabled=true; b.classList.remove("sel"); });
   if(ok){
     btn.classList.add("cor");
     const fb=document.getElementById("fbb");fb.className="fb show cfb";
@@ -4528,8 +4546,7 @@ function liveShowQ() {
 
 function updateLiveBars() {
   const total = Object.values(liveVotes).reduce((a,b)=>a+b,0);
-  const expected = liveParticipantCount || trainerParticipants?.length || "?";
-  document.getElementById("beamer-live-voters").textContent = total + " von " + expected + " haben abgestimmt";
+  document.getElementById("beamer-live-voters").textContent = total + (total === 1 ? " hat abgestimmt" : " haben abgestimmt");
   // Hide individual bars until reveal
   liveQuiz[liveIdx].antworten.forEach((a,i) => {
     const bar = document.getElementById("live-bar-" + i);
