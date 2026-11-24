@@ -1583,6 +1583,10 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <label class="login-label">Passwort wiederholen</label>
       <input class="login-input" id="re-pw2" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
     </div>
+    <div class="login-field">
+      <label class="login-label">Einladungscode</label>
+      <input class="login-input" id="re-invite" type="text" placeholder="Vom Trainer erhalten">
+    </div>
     <div class="login-field" id="trainer-code-field" style="display:none">
       <label class="login-label">Trainer-Code</label>
       <input class="login-input" id="re-code" type="text" placeholder="Vom Trainer erhalten">
@@ -1672,6 +1676,15 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
       <input class="login-input" id="admin-trainer-code" style="max-width:220px;background:var(--bg3);border-color:var(--border);color:var(--text)" placeholder="Neuer Trainer-Code">
       <button class="bp" onclick="saveTrainerCode()">Speichern</button>
       <span id="trainer-code-display" style="font-size:12.5px;color:var(--text3)"></span>
+    </div>
+  </div>
+  <div class="admin-section">
+    <div class="admin-section-title">🎟️ Einladungscode verwalten</div>
+    <div class="admin-section-sub">Mit diesem Code können sich neue Teilnehmer registrieren. Bestehende Konten bleiben unverändert.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="login-input" id="admin-invite-code" style="max-width:220px;background:var(--bg3);border-color:var(--border);color:var(--text)" placeholder="Neuer Einladungscode">
+      <button class="bp" onclick="saveInviteCode()">Speichern</button>
+      <span id="invite-code-display" style="font-size:12.5px;color:var(--text3)"></span>
     </div>
   </div>
   <!-- Fragenkatalog verwalten -->
@@ -3370,12 +3383,10 @@ async function doLogin() {
   if (!name || !pw) { showLoginError("Bitte Name und Passwort eingeben."); return; }
   const sb = await initSupabase();
   // Always fetch email from DB - no localStorage dependency
-  const { data: profiles, error: profileError } = await sb.from("profiles").select("name, email").ilike("name", name);
+  const { data: loginEmail, error: profileError } = await sb.rpc("email_for_login", { name_input: name });
   if (profileError) { showLoginError("Verbindungsfehler. Bitte Seite neu laden."); return; }
-  if (!profiles || profiles.length === 0) { showLoginError("Name nicht gefunden."); return; }
-  const profile = profiles[0];
-  if (!profile.email) { showLoginError("Konto nicht vollständig. Bitte Admin kontaktieren."); return; }
-  const { data, error } = await sb.auth.signInWithPassword({ email: profile.email, password: pw });
+  if (!loginEmail) { showLoginError("Name nicht gefunden."); return; }
+  const { data, error } = await sb.auth.signInWithPassword({ email: loginEmail, password: pw });
   if (error) { showLoginError("Name oder Passwort falsch."); return; }
   await loadProfile(data.user);
 }
@@ -3389,13 +3400,18 @@ async function doRegister() {
   if (pw.length < 6) { showLoginError("Passwort muss mindestens 6 Zeichen haben."); return; }
   if (pw !== pw2) { showLoginError("Passwörter stimmen nicht überein."); return; }
   const sb = await initSupabase();
-  // Check name not taken
-  const { data: existing } = await sb.from("profiles").select("id, name").ilike("name", name);
-  if (existing && existing.length > 0) { showLoginError("Dieser Name ist bereits vergeben. Bitte einen anderen Namen wählen."); return; }
-  // Trainer-Code wird serverseitig geprüft (Funktion check_trainer_code in Supabase)
-  if (code) {
-    const { data: codeOk, error: codeErr } = await sb.rpc("check_trainer_code", { code_input: code });
-    if (codeErr || codeOk !== true) { showLoginError("Ungültiger Trainer-Code."); return; }
+  const invite = document.getElementById("re-invite").value.trim();
+  // Namen und Codes werden serverseitig geprüft (Funktion check_registration in Supabase)
+  const { data: regCheck, error: regCheckErr } = await sb.rpc("check_registration", { name_input: name, invite_code: invite, trainer_code_input: code });
+  if (regCheckErr) { showLoginError("Verbindungsfehler. Bitte Seite neu laden."); return; }
+  if (regCheck !== "ok") {
+    const regMsgs = {
+      name_taken: "Dieser Name ist bereits vergeben. Bitte einen anderen Namen wählen.",
+      bad_invite_code: "Ungültiger Einladungscode.",
+      bad_trainer_code: "Ungültiger Trainer-Code.",
+      bad_name: "Bitte einen Namen eingeben."
+    };
+    showLoginError(regMsgs[regCheck] || "Registrierung nicht möglich."); return;
   }
   // Neue Konten starten immer als Teilnehmer; Trainer-Rolle vergibt der Server (claim_trainer)
   // Admin role is set manually via Supabase SQL
@@ -3413,16 +3429,16 @@ async function doRegister() {
   });
   if (error) { showLoginError("Fehler: " + error.message); return; }
   if (data.user) {
-    // Manually create profile
+    // Profil wird serverseitig angelegt (Funktion register_profile in Supabase)
     const sb2 = supabaseClient;
-    await sb2.from("profiles").upsert({
-      id: data.user.id,
-      name: name,
-      role: role,
-      email: email,
-      store: {}
+    const { data: regStatus, error: regErr } = await sb2.rpc("register_profile", {
+      name_input: name, email_input: email, invite_code: invite, trainer_code_input: code
     });
-    if (code) { await sb2.rpc("claim_trainer", { code_input: code }); }
+    if (regErr || regStatus !== "ok") {
+      await sb2.auth.signOut();
+      showLoginError("Registrierung fehlgeschlagen. Bitte Codes prüfen und erneut versuchen.");
+      return;
+    }
     await loadProfile(data.user);
   }
 }
@@ -5809,9 +5825,13 @@ async function goAdmin() {
   await loadAllParticipantsAdmin();
   const sb = await initSupabase();
   const { data } = await sb.from("settings").select("value").eq("key", "trainer_code").single();
-  const tc = data?.value || "trainer2024";
-  document.getElementById("trainer-code-display").textContent = "Aktuell: " + tc;
+  const tc = data?.value || "";
+  document.getElementById("trainer-code-display").textContent = "Aktuell: " + (tc || "–");
   document.getElementById("admin-trainer-code").value = tc;
+  const { data: inv } = await sb.from("settings").select("value").eq("key", "participant_code").maybeSingle();
+  const ic = inv?.value || "";
+  document.getElementById("invite-code-display").textContent = "Aktuell: " + (ic || "–");
+  document.getElementById("admin-invite-code").value = ic;
   // Load countdown date
   const {data:cd}=await sb.from("settings").select("value").eq("key","countdown_date").maybeSingle();
   if(cd?.value){
@@ -6120,6 +6140,21 @@ async function saveTrainerCode() {
   await sb.from("settings").update({ value: c }).eq("key", "trainer_code");
   document.getElementById("trainer-code-display").textContent = "Aktuell: " + c;
   alert("Trainer-Code gespeichert.");
+}
+
+async function saveInviteCode() {
+  const c = document.getElementById("admin-invite-code").value.trim();
+  if (!c) { alert("Code darf nicht leer sein."); return; }
+  if (c.length < 6) { alert("Bitte einen Code mit mindestens 6 Zeichen wählen."); return; }
+  const sb = await initSupabase();
+  const { data, error } = await sb.from("settings").update({ value: c }).eq("key", "participant_code").select();
+  if (error) { alert("Fehler beim Speichern: " + error.message); return; }
+  if (!data || data.length === 0) {
+    const { error: insErr } = await sb.from("settings").insert({ key: "participant_code", value: c });
+    if (insErr) { alert("Fehler beim Speichern: " + insErr.message); return; }
+  }
+  document.getElementById("invite-code-display").textContent = "Aktuell: " + c;
+  alert("Einladungscode gespeichert.");
 }
 
 // ─── SIDEBAR TOGGLE ────────────────────────────────────────
