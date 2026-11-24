@@ -1294,6 +1294,18 @@ body.dark .import-zone:hover,body.dark .import-zone.drag{background:rgba(217,48,
 .more-item:hover{background:var(--red-l);border-color:rgba(217,48,37,.2);color:var(--red-d)}
 .more-item.active{background:var(--red-l);border-color:rgba(217,48,37,.3);color:var(--red-d)}
 body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
+
+/* ── Einklappbare Bereiche ── */
+.admin-section .as-body{display:none;margin-top:.75rem}
+.admin-section.as-open .as-body{display:block}
+.admin-section-title.as-title{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none}
+.admin-section-title.as-title::after{content:"▾";font-size:13px;color:var(--text3);transition:transform .15s;transform:rotate(-90deg)}
+.admin-section.as-open .admin-section-title.as-title::after{transform:rotate(0)}
+details.home-more>summary,details.pc-more>summary{cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;color:var(--text2);padding:8px 2px;list-style:none;user-select:none}
+details.home-more>summary::-webkit-details-marker,details.pc-more>summary::-webkit-details-marker{display:none}
+details.home-more>summary::before,details.pc-more>summary::before{content:"▸";display:inline-block;margin-right:6px;transition:transform .15s}
+details.home-more[open]>summary::before,details.pc-more[open]>summary::before{transform:rotate(90deg)}
+details.pc-more{margin-top:.6rem;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -1877,7 +1889,9 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div class="tg" id="tg"></div>
 
 <!-- Weitere Übersichten -->
-<div style="margin-top:1.75rem">
+<details class="home-more" style="margin-top:1.5rem">
+<summary>Weitere Übersichten: Countdown, Lernhilfe, Rekorde</summary>
+<div style="margin-top:.75rem">
 <!-- Countdown + Tagesaufgabe + Bestleistung -->
 <div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
 <div id="home-lernhilfe" style="margin-bottom:1rem"></div>
@@ -1888,6 +1902,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div id="home-records"></div>
 
 </div>
+</details>
 
 </div><!-- /#screen-home -->
 
@@ -3803,6 +3818,7 @@ function participantCardHTML(p) {
       </div>
       <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${pctColor}">${pct}%</div>
     </div>
+    <details class="pc-more"><summary>Details anzeigen</summary>
     <div class="pc-stats">
       <div class="pc-stat"><span class="pc-stat-n">${done}</span><div class="pc-stat-l">Gesehen</div></div>
       <div class="pc-stat"><span class="pc-stat-n" style="color:${pctColor}">${pct}%</span><div class="pc-stat-l">Fortschritt</div></div>
@@ -3948,6 +3964,7 @@ function participantCardHTML(p) {
         </div>
       </details>`;
     })()}
+    </details>
   </div>`;
 }
 
@@ -6194,6 +6211,35 @@ async function saveInviteCode() {
   document.getElementById("invite-code-display").textContent = "Aktuell: " + c;
   alert("Einladungscode gespeichert.");
 }
+
+
+// ─── EINKLAPPBARE BEREICHE ─────────────────────────────────
+function initCollapsibles(){
+  document.querySelectorAll("#screen-admin .admin-section").forEach((sec,i)=>{
+    if(sec.dataset.cz)return;
+    const title=sec.querySelector(":scope > .admin-section-title");
+    if(!title)return;
+    sec.dataset.cz="1";
+    const body=document.createElement("div");body.className="as-body";
+    Array.from(sec.childNodes).forEach(n=>{if(n!==title)body.appendChild(n);});
+    sec.appendChild(body);
+    const key="fw_admin_open_"+i;
+    let open=false;try{open=localStorage.getItem(key)==="1";}catch(e){}
+    sec.classList.toggle("as-open",open);
+    title.classList.add("as-title");
+    title.setAttribute("role","button");title.tabIndex=0;
+    const toggle=()=>{const o=sec.classList.toggle("as-open");try{localStorage.setItem(key,o?"1":"0");}catch(e){}};
+    title.addEventListener("click",toggle);
+    title.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle();}});
+  });
+  const hm=document.querySelector("details.home-more");
+  if(hm&&!hm.dataset.cz){
+    hm.dataset.cz="1";
+    try{if(localStorage.getItem("fw_home_more")==="1")hm.open=true;}catch(e){}
+    hm.addEventListener("toggle",()=>{try{localStorage.setItem("fw_home_more",hm.open?"1":"0");}catch(e){}});
+  }
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initCollapsibles);else initCollapsibles();
 
 // ─── SIDEBAR TOGGLE ────────────────────────────────────────
 function toggleSidebar() {
