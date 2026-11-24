@@ -1,7 +1,7 @@
 {
   "name": "JF Mengeringhausen – Fragenbogentrainer",
   "short_name": "JF Fragebogen",
-  "description": "Lern-App der Jugendfeuerwehr Mengeringhausen für die Kreisübung",
+  "description": "Lern-App der Jugendfeuerwehr Mengeringhausen",
   "start_url": "/Fragebogentrainer/",
   "scope": "/Fragebogentrainer/",
   "display": "standalone",
