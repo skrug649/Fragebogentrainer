@@ -3399,15 +3399,14 @@ async function doRegister() {
   // Check name not taken
   const { data: existing } = await sb.from("profiles").select("id, name").ilike("name", name);
   if (existing && existing.length > 0) { showLoginError("Dieser Name ist bereits vergeben. Bitte einen anderen Namen wählen."); return; }
-  // Determine role
-  let role = "teilnehmer";
+  // Trainer-Code wird serverseitig geprüft (Funktion check_trainer_code in Supabase)
   if (code) {
-    const { data: setting } = await sb.from("settings").select("value").eq("key", "trainer_code").single();
-    if (code === (setting?.value || "trainer2024")) role = "trainer";
-    else { showLoginError("Ungültiger Trainer-Code."); return; }
+    const { data: codeOk, error: codeErr } = await sb.rpc("check_trainer_code", { code_input: code });
+    if (codeErr || codeOk !== true) { showLoginError("Ungültiger Trainer-Code."); return; }
   }
-  // Role is always teilnehmer unless trainer code used
+  // Neue Konten starten immer als Teilnehmer; Trainer-Rolle vergibt der Server (claim_trainer)
   // Admin role is set manually via Supabase SQL
+  const role = "teilnehmer";
   // Generate unique valid email using timestamp
   const uid = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   const email = uid + "@fragebogen.app";
@@ -3430,6 +3429,7 @@ async function doRegister() {
       email: email,
       store: {}
     });
+    if (code) { await sb2.rpc("claim_trainer", { code_input: code }); }
     await loadProfile(data.user);
   }
 }
