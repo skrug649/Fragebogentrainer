@@ -6,9 +6,9 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#cc0000">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="description" content="Lern-App der Jugendfeuerwehr Mengeringhausen für die Kreisübung Waldeck-Frankenberg">
+<meta name="description" content="Lern-App der Jugendfeuerwehr Mengeringhausen">
 <meta property="og:title" content="JF Mengeringhausen – Fragenbogentrainer">
-<meta property="og:description" content="Übe die Fragen für die Kreisübung der Jugendfeuerwehr Mengeringhausen">
+<meta property="og:description" content="Übe die Fragen der Jugendfeuerwehr Mengeringhausen">
 <meta property="og:image" content="icon-512.png">
 <meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1651,12 +1651,12 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   </div>
   <!-- Trainer code management -->
   <div class="admin-section">
-    <div class="admin-section-title">⏰ Kreisübung-Countdown verwalten</div>
+    <div class="admin-section-title">⏰ Countdown verwalten</div>
     <div class="admin-section-sub">Titel und Datum des Countdowns für alle Teilnehmer festlegen.</div>
     <div style="display:flex;flex-direction:column;gap:.75rem;max-width:480px">
       <div>
-        <label style="font-size:12px;font-weight:700;color:var(--text3);display:block;margin-bottom:4px">Titel (z.B. "Kreisübung Waldeck-Frankenberg 2026")</label>
-        <input class="login-input" id="admin-countdown-text" style="background:var(--bg3);border-color:var(--border);color:var(--text)" placeholder="Kreisübung Waldeck-Frankenberg 2026">
+        <label style="font-size:12px;font-weight:700;color:var(--text3);display:block;margin-bottom:4px">Titel (z.B. "Prüfung 2026")</label>
+        <input class="login-input" id="admin-countdown-text" style="background:var(--bg3);border-color:var(--border);color:var(--text)" placeholder="Prüfung 2026">
       </div>
       <div>
         <label style="font-size:12px;font-weight:700;color:var(--text3);display:block;margin-bottom:4px">Datum</label>
@@ -1786,15 +1786,8 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <!-- Live Session Banner -->
 <div id="live-session-banner" style="display:none;margin-bottom:1rem"></div>
 
-<div id="home-lernhilfe" style="margin-bottom:1rem"></div>
-
-<!-- Countdown + Tagesaufgabe + Bestleistung -->
-<div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
-<div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem" class="home-widgets-grid"></div>
-<div id="home-records"></div>
-
-<!-- Wochenpodium -->
-<div id="home-podium" style="margin-bottom:1.25rem"></div>
+<!-- Weitermachen Banner -->
+<div id="resume-banner" style="display:none"></div>
 
 <!-- Fortschritt + Schnellzugriff: 2-Spalten -->
 <div class="home-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
@@ -1841,9 +1834,6 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 
 </div>
 
-<!-- Weitermachen Banner -->
-<div id="resume-banner" style="display:none"></div>
-
 <!-- Bookmarks shortcut -->
 <div id="home-bm-bar" style="display:none;margin-bottom:1rem">
 <button style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 14px;font-size:13px;font-family:'Outfit',sans-serif;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm)" onclick="startBookmarkQuiz()">⭐ <span id="home-bm-count">0</span> markierte Fragen üben</button>
@@ -1854,6 +1844,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <button style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 14px;font-size:13px;font-family:'Outfit',sans-serif;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm)" onclick="startWeakQuiz()">🎯 <span id="home-weak-count">0</span> schwache Fragen üben</button>
 </div>
 
+<div id="home-widgets" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1.25rem" class="home-widgets-grid"></div>
 <!-- Filter Bar -->
 <div class="filter-bar">
 <div class="filter-section">
@@ -1884,6 +1875,19 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <div class="section-title">Themengebiete <span class="section-count" id="tg-count"></span></div>
 </div>
 <div class="tg" id="tg"></div>
+
+<!-- Weitere Übersichten -->
+<div style="margin-top:1.75rem">
+<!-- Countdown + Tagesaufgabe + Bestleistung -->
+<div id="home-widgets-countdown" style="margin-bottom:.75rem"></div>
+<div id="home-lernhilfe" style="margin-bottom:1rem"></div>
+
+<!-- Wochenpodium -->
+<div id="home-podium" style="margin-bottom:1.25rem"></div>
+
+<div id="home-records"></div>
+
+</div>
 
 </div><!-- /#screen-home -->
 
@@ -1949,7 +1953,7 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
   <div style="text-align:center;padding:2rem 0 1.5rem">
     <div style="width:72px;height:72px;background:linear-gradient(135deg,#b91c1c,var(--red));border-radius:20px;display:inline-flex;align-items:center;justify-content:center;font-size:34px;margin-bottom:1.25rem;box-shadow:0 8px 24px rgba(217,48,37,.35)">🎯</div>
     <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.3px;margin-bottom:.5rem">Prüfungsmodus</div>
-    <div style="font-size:14px;color:var(--text3);line-height:1.7;max-width:380px;margin:0 auto">Simuliere die echte Kreisübung – 15 zufällige Fragen, kein Feedback bis zum Ende.</div>
+    <div style="font-size:14px;color:var(--text3);line-height:1.7;max-width:380px;margin:0 auto">Simuliere eine echte Prüfung – 15 zufällige Fragen, kein Feedback bis zum Ende.</div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.5rem">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem;text-align:center;box-shadow:var(--shadow-sm)">
@@ -2528,7 +2532,8 @@ function renderResumeBanner(){
   const total=r.quizKeys.length;
   const done=r.idx;
   const left=total-done;
-  const themaLabel=r.thema==="alle"?"Alle Themen":r.thema;
+  const themaNames={alle:"Alle Themen",__weak__:"Schwache Fragen",__bookmarks__:"Markierte Fragen",daily:"Tagesaufgabe"};
+  const themaLabel=themaNames[r.thema]||r.thema;
   b.style.display="flex";
   b.innerHTML=`<div class="resume-text"><strong>▶ Weitermachen wo du aufgehört hast</strong>${themaLabel} · Frage ${done+1} von ${total} · noch ${left} ${left===1?"Frage":"Fragen"} offen</div><div class="resume-btns"><button class="resume-continue" onclick="resumeQuiz()">Weitermachen →</button><button class="resume-dismiss" onclick="dismissResume()">✕</button></div>`;
 }
@@ -2536,7 +2541,7 @@ function resumeQuiz(){
   if(!store.resume)return;
   const r=store.resume;
   if(r.mode)mode=r.mode;
-  if(r.thema)thema=r.thema;
+  if(r.thema&&r.thema!=="daily"&&!String(r.thema).startsWith("__"))thema=r.thema;
   applyF();
   startQuiz(r);
 }
@@ -2819,7 +2824,7 @@ function getCountdown(){
   return{days:Math.floor(diff/86400000),hours:Math.floor((diff%86400000)/3600000),mins:Math.floor((diff%3600000)/60000),secs:Math.floor((diff%60000)/1000),done:false};
 }
 function setCountdownDate(){
-  const d=prompt("Datum der Kreisübung (Format: JJJJ-MM-TT z.B. 2026-09-15):",store.countdownDate||"");
+  const d=prompt("Datum des Termins (Format: JJJJ-MM-TT z.B. 2026-09-15):",store.countdownDate||"");
   if(!d)return;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert("Format: JJJJ-MM-TT");return;}
   store.countdownDate=d;saveStore();renderWidgets();
@@ -2869,7 +2874,7 @@ function renderWidgets(){
     </button>
   </div>`);
   const cd=getCountdown();
-  const cdText=store.countdownText||"Kreisübung";
+  const cdText=store.countdownText||"Termin";
   const isTrainerOrAdmin=currentProfile&&(currentProfile.role==="trainer"||currentProfile.role==="admin");
   if(cdEl){
     cdEl.innerHTML=`<div class="widget-card" style="text-align:center;padding:1.25rem">
@@ -3723,7 +3728,7 @@ function participantCardHTML(p) {
       const perDay = Math.ceil(remaining / daysLeft);
       const urgency = perDay > 20 ? "var(--red)" : perDay > 10 ? "var(--amber)" : "var(--green)";
       goalHTML = `<div style="margin-top:6px;padding:6px 8px;background:var(--bg3);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <div style="font-size:11px;color:var(--text3);flex:1">🎯 Ziel bis Kreisübung</div>
+        <div style="font-size:11px;color:var(--text3);flex:1">🎯 Ziel bis zum Termin</div>
         <div style="font-family:'Outfit',sans-serif;font-weight:800;font-size:13px;color:${urgency};white-space:nowrap">${perDay} Fragen/Tag</div>
       </div>`;
     }
@@ -4151,10 +4156,10 @@ function launchConfetti() {
 
 // ─── MOTIVATIONSNACHRICHTEN ──────────────────────────────────
 const MOTIVATIONS = {
-  firstSession: ["Super Start! 🔥 Du hast deine erste Runde abgeschlossen!", "Gut gemacht! Der erste Schritt ist getan 💪", "Weiter so – jede Frage bringt dich näher zur Kreisübung! 🎯"],
+  firstSession: ["Super Start! 🔥 Du hast deine erste Runde abgeschlossen!", "Gut gemacht! Der erste Schritt ist getan 💪", "Weiter so – jede Frage bringt dich näher zum Ziel! 🎯"],
   streak3: ["3 Tage in Folge! Du bist auf dem richtigen Weg 🔥🔥", "Stark! 3 Tage Streak – bleib dabei! 💪"],
   streak7: ["Eine ganze Woche! Du bist unaufhaltbar! 🔥🔥🔥", "7 Tage Streak – beeindruckend! 🏆"],
-  perfect: ["Perfekte Runde! 100% richtig – Wahnsinn! 🎯✨", "Alle Fragen richtig! Du bist bereit für die Kreisübung! 🏆"],
+  perfect: ["Perfekte Runde! 100% richtig – Wahnsinn! 🎯✨", "Alle Fragen richtig! Du bist bereit für die Prüfung! 🏆"],
   improvement: ["Du wirst besser! Tolle Verbesserung zur letzten Runde! 📈", "Aufwärtstrend! Keep it up! 🚀"],
   thema100: ["Thema abgeschlossen! Du hast das gemeistert! 🎉", "100% in einem Thema – Klasse! ⭐"],
 };
@@ -4391,7 +4396,7 @@ document.getElementById("notif-modal").addEventListener("click", function(e) {
 // ─── ONBOARDING ─────────────────────────────────────────────
 const TRAINER_OB_STEPS = [
   { icon: "👥", title: "Willkommen in der Trainer-Ansicht!", text: "Hier hast du alle Werkzeuge um den Lernfortschritt deiner Gruppe zu verfolgen und zu steuern. Lass uns die wichtigsten Funktionen kurz erklären." },
-  { icon: "📈", title: "Gruppenfortschritt", text: "Ganz oben siehst du den Überblick: wie weit die Gruppe insgesamt ist, die Trefferquote, wer inaktiv ist und wie viele Tage bis zur Kreisübung noch bleiben. Die Karten der Teilnehmer zeigen Rang, Verbesserungsrate, schwächste Frage und Lernzeit-Schätzung." },
+  { icon: "📈", title: "Gruppenfortschritt", text: "Ganz oben siehst du den Überblick: wie weit die Gruppe insgesamt ist, die Trefferquote, wer inaktiv ist und wie viele Tage bis zum Termin noch bleiben. Die Karten der Teilnehmer zeigen Rang, Verbesserungsrate, schwächste Frage und Lernzeit-Schätzung." },
   { icon: "🔍", title: "Schwachstellen & Empfehlungen", text: "Unter 'Schwachstellen' siehst du welche Themen am schlechtesten laufen und die schwierigste Frage der Woche. Unter 'Empfehlungen' bekommst du konkrete Hinweise was du als Trainer tun kannst." },
   { icon: "⚖️", title: "Vergleich & Prüfungen", text: "Unter 'Vergleich' kannst du zwei Teilnehmer direkt gegenüberstellen. Unter 'Prüfungen' siehst du alle Ergebnisse mit Details – und kannst mit 👍🔥💪 auf Prüfungen reagieren. Teilnehmer sehen deine Reaktion beim nächsten Login!" },
   { icon: "❓", title: "Anfragen & Kommentare", text: "Wenn ein Teilnehmer eine Frage nicht versteht kann er eine Erklärung anfragen. Du siehst alle Anfragen und kannst direkt einen Kommentar hinterlassen – der Teilnehmer bekommt beim nächsten Login eine Benachrichtigung." },
@@ -4434,7 +4439,7 @@ function trainerObRender() {
 }
 
 const OB_STEPS = [
-  { icon: "🔥", title: "Willkommen beim Fragenbogentrainer!", text: "Diese App hilft dir dich optimal auf die Kreisübung der Jugendfeuerwehr Mengeringhausen vorzubereiten. Lass uns kurz erklären wie alles funktioniert." },
+  { icon: "🔥", title: "Willkommen beim Fragenbogentrainer!", text: "Diese App hilft dir, dich optimal auf die Prüfungen und Übungen der Jugendfeuerwehr vorzubereiten. Lass uns kurz erklären wie alles funktioniert." },
   { icon: "📖", title: "Fragebogen & Rundengröße", text: "Unter 'Fragebogen' findest du alle Fragen nach Thema sortiert. Du kannst die Rundengröße wählen: 5, 10, 15, 20 oder alle Fragen. Nach einer falschen Antwort kannst du eine Erklärung beim Trainer anfragen oder eine Frage melden." },
   { icon: "🎯", title: "Prüfungsmodus", text: "Der Prüfungsmodus simuliert die echte Prüfung: 15 Fragen, kein Feedback während der Runde. Wähle deine Antwort und bestätige sie – du kannst vorher noch wechseln. Dein Trainer sieht dein Ergebnis und kann darauf reagieren!" },
   { icon: "🏅", title: "Feuerwehr-Ränge", text: "Je mehr du übst und je besser deine Trefferquote wird, desto höher steigst du auf – von Anwärter/in bis zum Brandmeister/in. Der Rang erscheint auf deiner Startseite und basiert auf Fortschritt und Trefferquote." },
@@ -5086,7 +5091,7 @@ function renderLernhilfe() {
           <div style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.5px;text-transform:uppercase">Fragen/Tag</div>
         </div>
         <div style="font-size:12.5px;color:var(--text2);flex:1">
-          Noch <strong>${remaining}</strong> Fragen · <strong>${daysLeft}</strong> Tage bis zur Kreisübung
+          Noch <strong>${remaining}</strong> Fragen · <strong>${daysLeft}</strong> Tage bis zum Termin
         </div>
       </div>
       ${topThemen.length ? `
@@ -5134,7 +5139,7 @@ function renderGroupProgress() {
     const urgency = days <= 14 ? "var(--red)" : days <= 30 ? "var(--amber)" : "var(--green)";
     countdownHTML = `
       <div style="text-align:center;padding:.75rem 1.25rem;background:var(--bg3);border-radius:var(--radius-md);border:1px solid var(--border)">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Kreisübung</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:4px">Termin</div>
         <div style="font-family:'Outfit',sans-serif;font-weight:900;font-size:28px;color:${urgency};line-height:1">${days}</div>
         <div style="font-size:11px;color:var(--text3);margin-top:2px">Tage</div>
       </div>
@@ -5934,7 +5939,7 @@ const THEMES = [
   { key: "halloween",   label: "🎃 Halloween",    emoji: "🎃" },
   { key: "fruehling",   label: "🌸 Frühling",     emoji: "🌸" },
   { key: "sommer",      label: "☀️ Sommer",       emoji: "☀️" },
-  { key: "kreisuebung", label: "🚒 Kreisübung",   emoji: "🚒" },
+  { key: "kreisuebung", label: "🚒 Feuerwehr-Dunkelrot", emoji: "🚒" },
 ];
 
 async function loadTheme() {
@@ -5962,7 +5967,7 @@ function updateSeasonalDecorations(key) {
     halloween: "🎃 Happy Halloween 🎃",
     fruehling: "🌸 Frühling ist da! 🌸",
     sommer: "☀️ Schöner Sommer! ☀️",
-    kreisuebung: "🚒 Kreisübung rückt näher! 💪"
+    kreisuebung: "🚒 Bleib dran! 💪"
   };
   if (!decos[key]) return;
   const bar = document.createElement("div");
