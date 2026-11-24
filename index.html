@@ -3331,13 +3331,6 @@ async function loadProfile(user) {
   const sb = supabaseClient;
   const { data: profile, error } = await sb.from("profiles").select("*").eq("id", user.id).single();
   if (error || !profile) { await sb.auth.signOut(); showLoginScreen(); return; }
-  // Handle pending password reset set by admin
-  if (profile.pending_password) {
-    const { error: pwErr } = await sb.auth.updateUser({ password: profile.pending_password });
-    if (!pwErr) {
-      await sb.from("profiles").update({ pending_password: null }).eq("id", user.id);
-    }
-  }
   // Save last login timestamp
   await sb.from("profiles").update({ last_login: new Date().toISOString() }).eq("id", user.id);
   currentProfile = profile;
@@ -6011,13 +6004,13 @@ async function resetPassword(id, name) {
     if (newPw.length < 6) { showErr('Passwort muss mindestens 6 Zeichen haben.'); return; }
     if (newPw !== newPw2) { showErr('Passwörter stimmen nicht überein.'); return; }
     const sb = await initSupabase();
-    const { error } = await sb.from('profiles').update({ pending_password: newPw }).eq('id', id);
+    const { error } = await sb.rpc('admin_set_password', { target_id: id, new_password: newPw });
     if (error) { showErr('Fehler: ' + error.message); return; }
     overlay.remove();
     // Show success
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:99px;font-family:Outfit,sans-serif;font-weight:700;font-size:13.5px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
-    toast.textContent = '✓ Passwort für ' + name + ' gespeichert';
+    toast.textContent = '✓ Passwort für ' + name + ' geändert';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
   };
