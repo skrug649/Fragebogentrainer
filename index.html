@@ -1849,6 +1849,11 @@ body.dark .more-item.active{background:rgba(217,48,37,.1);color:#ff8070}
 <button style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 14px;font-size:13px;font-family:'Outfit',sans-serif;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm)" onclick="startBookmarkQuiz()">⭐ <span id="home-bm-count">0</span> markierte Fragen üben</button>
 </div>
 
+<!-- Schwache Fragen -->
+<div id="home-weak-bar" style="display:none;margin-bottom:1rem">
+<button style="display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 14px;font-size:13px;font-family:'Outfit',sans-serif;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm)" onclick="startWeakQuiz()">🎯 <span id="home-weak-count">0</span> schwache Fragen üben</button>
+</div>
+
 <!-- Filter Bar -->
 <div class="filter-bar">
 <div class="filter-section">
@@ -2491,6 +2496,7 @@ function showResults(){
   // recentWrong is saved in realtime during the quiz
   // Remove lernmodus badge if present
   const badge=document.getElementById("lm-badge");if(badge)badge.remove();
+  const weakBadge=document.getElementById("weak-badge");if(weakBadge)weakBadge.remove();
   showScreen("results");
   endLernmodusCheck();
   let em,ti,su;
@@ -2562,11 +2568,38 @@ function updBookmarkSidebar(){
   const bmCnt=document.getElementById("home-bm-count");
   if(bmBar)bmBar.style.display=count>0?"block":"none";
   if(bmCnt)bmCnt.textContent=count;
+  const weakBar=document.getElementById("home-weak-bar");
+  const weakCnt=document.getElementById("home-weak-count");
+  const weakN=weakQuestions().length;
+  if(weakBar)weakBar.style.display=weakN>0?"block":"none";
+  if(weakCnt)weakCnt.textContent=weakN;
   // Legacy sidebar (hidden but keep for safety)
   const sidebar=document.getElementById("bm-sidebar");
   const cntEl=document.getElementById("bm-count");
   if(sidebar)sidebar.style.display=count>0?"block":"none";
   if(cntEl)cntEl.textContent=count+" markiert";
+}
+// Schwache Fragen: mindestens 2 Versuche und weniger als 60 % richtig
+function weakQuestions(){
+  const qst=store.qstats||{};
+  return ALL.filter(q=>{const v=qst[qKey(q)];return v&&v.total>=2&&Math.round(v.correct/v.total*100)<60;});
+}
+function startWeakQuiz(){
+  const wq=weakQuestions();
+  if(!wq.length){alert("Noch keine schwachen Fragen. Beantworte erst ein paar Fragen, dann erscheint hier, was noch nicht sitzt.");return;}
+  quiz=order==="reihenfolge"?[...wq]:shuffle(wq);
+  idx=0;results=[];
+  store.resume={quizKeys:quiz.map(q=>qKey(q)),idx:0,results:[],thema:"__weak__",mode};
+  saveStore();
+  showScreen("quiz");
+  document.getElementById("qt").textContent=quiz.length;
+  renderDots();showQ();
+  const qpt=document.querySelector(".qpt");
+  if(qpt&&!document.getElementById("weak-badge")){
+    const b=document.createElement("span");b.id="weak-badge";b.className="lm-badge";
+    b.style.cssText="background:var(--red-l);color:var(--red-d)";b.textContent="🎯 Schwache Fragen";
+    qpt.appendChild(b);
+  }
 }
 function startBookmarkQuiz(){
   const bm=store.bookmarks||{};
